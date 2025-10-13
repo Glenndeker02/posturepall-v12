@@ -1,0 +1,482 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { 
+  Camera, 
+  CameraOff, 
+  Pause, 
+  Play, 
+  Square, 
+  Volume2, 
+  VolumeX,
+  Maximize2,
+  Minimize2,
+  Settings,
+  Activity
+} from 'lucide-react'
+
+interface PostureMetrics {
+  headAngle: number
+  shoulderSymmetry: number
+  spineAlignment: number
+  distanceFromScreen: number
+  overallScore: number
+  status: 'excellent' | 'good' | 'fair' | 'poor'
+}
+
+export default function PostureMonitoring() {
+  const [isSessionActive, setIsSessionActive] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [cameraEnabled, setCameraEnabled] = useState(false)
+  const [audioEnabled, setAudioEnabled] = useState(true)
+  const [detailedView, setDetailedView] = useState(false)
+  const [sessionTime, setSessionTime] = useState(0)
+  const [postureMetrics, setPostureMetrics] = useState<PostureMetrics>({
+    headAngle: 0,
+    shoulderSymmetry: 0,
+    spineAlignment: 0,
+    distanceFromScreen: 0,
+    overallScore: 85,
+    status: 'good'
+  })
+  const [goodPosturePercent, setGoodPosturePercent] = useState(85)
+  const [alertsReceived, setAlertsReceived] = useState(0)
+  const [correctionSpeed, setCorrectionSpeed] = useState(42)
+  
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Simulate posture analysis
+  const analyzePosture = useCallback(() => {
+    if (!isSessionActive || isPaused) return
+
+    setPostureMetrics(prev => {
+      const newScore = Math.max(0, Math.min(100, 
+        prev.overallScore + (Math.random() - 0.6) * 10
+      ))
+      
+      const status = newScore >= 80 ? 'excellent' : 
+                    newScore >= 60 ? 'good' : 
+                    newScore >= 40 ? 'fair' : 'poor'
+
+      return {
+        headAngle: Math.random() * 20 - 10,
+        shoulderSymmetry: Math.random() * 15,
+        spineAlignment: Math.random() * 25,
+        distanceFromScreen: 18 + Math.random() * 8,
+        overallScore: Math.round(newScore),
+        status
+      }
+    })
+
+    setGoodPosturePercent(prev => Math.max(0, Math.min(100, 
+      prev + (Math.random() - 0.4) * 2
+    )))
+  }, [isSessionActive, isPaused])
+
+  // Session timer
+  useEffect(() => {
+    if (isSessionActive && !isPaused) {
+      intervalRef.current = setInterval(() => {
+        setSessionTime(prev => prev + 1)
+        analyzePosture()
+      }, 1000)
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [isSessionActive, isPaused, analyzePosture])
+
+  // Camera management
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      })
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        streamRef.current = stream
+        setCameraEnabled(true)
+      }
+    } catch (error) {
+      console.error('Camera access denied:', error)
+      // Fallback to simulated mode
+      setCameraEnabled(false)
+    }
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setCameraEnabled(false)
+  }
+
+  const startSession = async () => {
+    await startCamera()
+    setIsSessionActive(true)
+    setSessionTime(0)
+    setAlertsReceived(0)
+    setGoodPosturePercent(85)
+  }
+
+  const stopSession = () => {
+    setIsSessionActive(false)
+    setIsPaused(false)
+    stopCamera()
+  }
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'excellent': return 'bg-green-500'
+      case 'good': return 'bg-lime-500'
+      case 'fair': return 'bg-yellow-500'
+      case 'poor': return 'bg-red-500'
+      default: return 'bg-gray-500'
+    }
+  }
+
+  const getStatusTextColor = (status: string) => {
+    switch (status) {
+      case 'excellent': return 'text-green-600'
+      case 'good': return 'text-lime-600'
+      case 'fair': return 'text-yellow-600'
+      case 'poor': return 'text-red-600'
+      default: return 'text-gray-600'
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="sm">
+                ← Back to Dashboard
+              </Button>
+              <h1 className="text-xl font-semibold">Posture Monitoring</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="audio-toggle">Audio</Label>
+                <Switch 
+                  id="audio-toggle"
+                  checked={audioEnabled}
+                  onCheckedChange={setAudioEnabled}
+                />
+                {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="view-toggle">Detailed View</Label>
+                <Switch 
+                  id="view-toggle"
+                  checked={detailedView}
+                  onCheckedChange={setDetailedView}
+                />
+              </div>
+              <Button variant="outline" size="sm">
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Main Monitoring Area */}
+          <div className="lg:col-span-2">
+            <Card className="relative overflow-hidden">
+              <CardContent className="p-0">
+                {/* Posture Aura Effect */}
+                <div className={`absolute inset-0 transition-all duration-1000 opacity-20 pointer-events-none ${
+                  getStatusColor(postureMetrics.status)
+                }`} />
+                
+                {/* Camera View or Placeholder */}
+                <div className="relative aspect-video bg-gray-900">
+                  {cameraEnabled ? (
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="text-center">
+                        <Camera className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                        <p className="text-gray-400">
+                          {isSessionActive ? 'Camera access denied' : 'Camera will activate during session'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Session Overlay */}
+                  {isSessionActive && (
+                    <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
+                      <div className="bg-black/50 backdrop-blur rounded-lg px-3 py-2">
+                        <p className="text-white font-mono text-sm">{formatTime(sessionTime)}</p>
+                      </div>
+                      <div className="bg-black/50 backdrop-blur rounded-lg px-3 py-2">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-3 h-3 rounded-full ${getStatusColor(postureMetrics.status)}`} />
+                          <p className="text-white text-sm capitalize">{postureMetrics.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Detailed View Overlay */}
+                  {detailedView && isSessionActive && (
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <div className="bg-black/50 backdrop-blur rounded-lg p-4">
+                        <div className="grid grid-cols-4 gap-4 text-white">
+                          <div>
+                            <p className="text-xs opacity-75">Head Angle</p>
+                            <p className="font-mono">{postureMetrics.headAngle.toFixed(1)}°</p>
+                          </div>
+                          <div>
+                            <p className="text-xs opacity-75">Shoulders</p>
+                            <p className="font-mono">{postureMetrics.shoulderSymmetry.toFixed(1)}%</p>
+                          </div>
+                          <div>
+                            <p className="text-xs opacity-75">Spine</p>
+                            <p className="font-mono">{postureMetrics.spineAlignment.toFixed(1)}%</p>
+                          </div>
+                          <div>
+                            <p className="text-xs opacity-75">Score</p>
+                            <p className="font-mono">{postureMetrics.overallScore}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Session Controls */}
+                <div className="p-4 bg-gray-50 border-t">
+                  <div className="flex justify-center items-center space-x-4">
+                    {!isSessionActive ? (
+                      <Button 
+                        onClick={startSession}
+                        size="lg"
+                        className="bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        <Play className="w-5 h-5 mr-2" />
+                        Start Session
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={() => setIsPaused(!isPaused)}
+                          variant="outline"
+                          size="lg"
+                        >
+                          {isPaused ? (
+                            <Play className="w-5 h-5 mr-2" />
+                          ) : (
+                            <Pause className="w-5 h-5 mr-2" />
+                          )}
+                          {isPaused ? 'Resume' : 'Pause'}
+                        </Button>
+                        <Button
+                          onClick={stopSession}
+                          variant="destructive"
+                          size="lg"
+                        >
+                          <Square className="w-5 h-5 mr-2" />
+                          End Session
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Session Stats */}
+            {isSessionActive && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-gray-600">Good Posture</p>
+                    <p className="text-2xl font-bold text-green-600">{goodPosturePercent.toFixed(0)}%</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-gray-600">Alerts</p>
+                    <p className="text-2xl font-bold text-orange-600">{alertsReceived}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-gray-600">Correction Speed</p>
+                    <p className="text-2xl font-bold text-blue-600">{correctionSpeed}s</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <p className="text-sm text-gray-600">Points</p>
+                    <p className="text-2xl font-bold text-purple-600">+{Math.floor(sessionTime / 60) * 10}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Real-time Metrics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Activity className="w-5 h-5 mr-2" />
+                  Real-time Metrics
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Overall Score</span>
+                    <span className={`text-sm font-bold ${getStatusTextColor(postureMetrics.status)}`}>
+                      {postureMetrics.overallScore}%
+                    </span>
+                  </div>
+                  <Progress value={postureMetrics.overallScore} className="h-2" />
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-600">Head Angle</span>
+                      <span className="text-xs">{Math.abs(postureMetrics.headAngle).toFixed(1)}°</span>
+                    </div>
+                    <Progress 
+                      value={Math.max(0, 100 - Math.abs(postureMetrics.headAngle) * 5)} 
+                      className="h-1" 
+                    />
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-600">Shoulder Symmetry</span>
+                      <span className="text-xs">{(100 - postureMetrics.shoulderSymmetry).toFixed(0)}%</span>
+                    </div>
+                    <Progress 
+                      value={100 - postureMetrics.shoulderSymmetry} 
+                      className="h-1" 
+                    />
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-gray-600">Spine Alignment</span>
+                      <span className="text-xs">{(100 - postureMetrics.spineAlignment).toFixed(0)}%</span>
+                    </div>
+                    <Progress 
+                      value={100 - postureMetrics.spineAlignment} 
+                      className="h-1" 
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Alert Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Alert Settings</CardTitle>
+                <CardDescription>
+                  Customize your posture alerts
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Sensitivity</Label>
+                  <Slider
+                    defaultValue={[50]}
+                    max={100}
+                    step={10}
+                    className="mt-2"
+                  />
+                </div>
+                
+                <div>
+                  <Label className="text-sm font-medium">Alert Delay</Label>
+                  <Slider
+                    defaultValue={[30]}
+                    max={120}
+                    step={15}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Seconds before alert</p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Haptic Feedback</Label>
+                  <Switch defaultValue={true} />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Next Break */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Next Break</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-indigo-600">12:45</p>
+                  <p className="text-sm text-gray-600">Standard Break (5 min)</p>
+                  <Button variant="outline" size="sm" className="mt-2">
+                    Start Now
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
