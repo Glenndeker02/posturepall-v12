@@ -264,11 +264,6 @@ export function BreakRoutine({ exercises, onComplete, onExit }: BreakRoutineProp
                 <p className="text-lg leading-relaxed">
                   {currentExercise.steps[currentStep].instruction}
                 </p>
-                {currentExercise.steps[currentStep].duration && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Hold for {currentExercise.steps[currentStep].duration} seconds
-                  </p>
-                )}
               </div>
             </div>
           </div>

@@ -114,11 +114,12 @@ export default function PostureMonitoring() {
         prev.overallScore + (Math.random() - 0.6) * 10
       ))
 
-      const status = newScore >= 80 ? 'excellent' :
-                    newScore >= 60 ? 'good' :
-                    newScore >= 40 ? 'fair' : 'poor'
+      const status: 'excellent' | 'good' | 'fair' | 'poor' =
+        newScore >= 80 ? 'excellent' :
+        newScore >= 60 ? 'good' :
+        newScore >= 40 ? 'fair' : 'poor'
 
-      const newMetrics = {
+      const newMetrics: PostureMetrics = {
         headAngle: Math.random() * 20 - 10,
         shoulderSymmetry: Math.random() * 15,
         spineAlignment: Math.random() * 25,
@@ -246,8 +247,21 @@ export default function PostureMonitoring() {
     setCameraEnabled(false)
   }
 
-  const handleWorkstationCreated = (workstation: Workstation) => {
-    setSelectedWorkstation(workstation)
+  const handleWorkstationCreated = (workstation: {
+    id: string;
+    name: string;
+    location: string | null;
+    calibrationData: any | null;
+  }) => {
+    // Convert to full Workstation type for selectedWorkstation
+    const fullWorkstation: Workstation = {
+      ...workstation,
+      userId,
+      isDefault: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+    setSelectedWorkstation(fullWorkstation)
     setShowAddWorkstationDialog(false)
   }
 

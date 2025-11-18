@@ -27,6 +27,28 @@ model User {
   calibrationData   String?  // JSON object with posture baseline (deprecated - use Workstation)
   qrPairingCode     String?  @unique
   mobileDeviceId    String?
+
+  // Streak tracking
+  currentStreak     Int      @default(0)  // current daily goal streak
+  longestStreak     Int      @default(0)  // longest daily goal streak ever
+  lastActivityDate  DateTime? // last day user had activity (for streak calculation)
+  streakFreezes     Int      @default(1)  // available streak freeze tokens
+
+  // Break streak tracking
+  currentBreakStreak Int     @default(0)  // current break completion streak
+  longestBreakStreak Int     @default(0)  // longest break streak ever
+
+  // Total statistics
+  totalPoints       Int      @default(0)  // lifetime posture points
+  totalSessions     Int      @default(0)  // total posture sessions completed
+  totalBreaks       Int      @default(0)  // total breaks completed
+
+  // Preferences
+  dailyGoalScore    Int      @default(80) // target daily posture score (%)
+  weeklyGoalScore   Int      @default(80) // target weekly average score (%)
+  breakRemindersEnabled Boolean @default(true)
+  streakRemindersEnabled Boolean @default(true)
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -35,6 +57,7 @@ model User {
   achievements      UserAchievement[]
   goals             Goal[]
   workstations      Workstation[]
+  dailyStats        DailyStats[]
 }
 
 model PostureSession {
@@ -174,4 +197,47 @@ model Workstation {
   postureSessions PostureSession[]
 
   @@index([userId])
+}
+
+model DailyStats {
+  id                  String   @id @default(cuid())
+  userId              String
+  date                DateTime // date for these stats (day start)
+
+  // Daily metrics
+  postureScore        Int?     // average posture score for the day (0-100)
+  sessionCount        Int      @default(0) // number of sessions
+  totalDuration       Int      @default(0) // total minutes monitored
+  pointsEarned        Int      @default(0) // points earned this day
+
+  // Break metrics
+  breaksScheduled     Int      @default(0) // number of breaks that should have occurred
+  breaksCompleted     Int      @default(0) // number of breaks completed
+  breaksSnoozed       Int      @default(0) // number of breaks snoozed
+  breaksSkipped       Int      @default(0) // number of breaks skipped
+
+  // Posture quality breakdown (minutes)
+  timeExcellent       Int      @default(0) // minutes in excellent posture
+  timeGood            Int      @default(0) // minutes in good posture
+  timeFair            Int      @default(0) // minutes in fair posture
+  timePoor            Int      @default(0) // minutes in poor posture
+
+  // Streak status
+  dailyGoalMet        Boolean  @default(false)
+  breakGoalMet        Boolean  @default(false)
+
+  // Problem areas (JSON)
+  problemAreas        String?  // JSON object with frequency by body part
+
+  // Best session of the day
+  bestSessionScore    Int?     // highest scoring session
+  bestSessionId       String?  // reference to that session
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }

@@ -212,7 +212,7 @@ function WorkstationCalibrationStatus({
           <p className="text-xs text-muted-foreground">
             {hasCalibration
               ? `Last calibrated: ${new Date(
-                  workstation.calibrationData!.timestamp
+                  workstation.calibrationData!.capturedAt
                 ).toLocaleDateString()}`
               : 'Calibration required for accurate posture tracking'}
           </p>
