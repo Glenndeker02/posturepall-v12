@@ -46,10 +46,42 @@ model PostureSession {
   duration            Int?     // in minutes
   overallScore        Int?     // 0-100
   goodPosturePercent  Float?   // percentage
-  deviationBreakdown  String?  // JSON object
+  deviationBreakdown  String?  // JSON object with time in each quality category
   alertsReceived      Int?     // number of alerts
   correctionSpeed     Float?   // average time to correct in seconds
   pointsEarned        Int?
+  bonusPoints         Int?     // bonus points for achievements
+
+  // Detailed metrics
+  timeExcellent       Int?     // seconds in excellent posture
+  timeGood            Int?     // seconds in good posture
+  timeFair            Int?     // seconds in fair posture
+  timePoor            Int?     // seconds in poor posture
+
+  // Alert breakdown
+  postureAlerts       Int?     // number of posture correction alerts
+  breakReminders      Int?     // number of break reminders
+
+  // Problem areas tracking
+  problemAreas        String?  // JSON object with frequency by body part
+  mostCommonIssue     String?  // most frequent deviation type
+
+  // Posture quality timeline
+  postureTimeline     String?  // JSON array of {timestamp, score} for graph
+
+  // Personal records
+  longestGoodStreak   Int?     // longest continuous good posture in seconds
+  isPersonalRecord    Boolean  @default(false)
+  recordType          String?  // type of record if applicable
+
+  // Environmental factors
+  avgScreenDistance   Float?   // average distance from screen in cm
+  lightingQuality     String?  // good/fair/poor
+
+  // AI insights
+  aiInsights          String?  // JSON array of personalized insights
+  recommendations     String?  // JSON array of action recommendations
+
   mobileSynced        Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

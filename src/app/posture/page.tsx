@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { WorkstationSelector, type Workstation } from '@/components/features/workstation-selector'
 import { AddWorkstationDialog } from '@/components/features/add-workstation-dialog'
+import { SessionSummary } from '@/components/features/session-summary'
+import { analyzeSession, type SessionDataPoint, type SessionAnalytics } from '@/lib/analytics/session-analytics'
 import {
   Camera,
   CameraOff,
@@ -44,6 +46,7 @@ export default function PostureMonitoring() {
   const [audioEnabled, setAudioEnabled] = useState(true)
   const [detailedView, setDetailedView] = useState(false)
   const [sessionTime, setSessionTime] = useState(0)
+  const [sessionStartTime, setSessionStartTime] = useState<number>(0)
   const [postureMetrics, setPostureMetrics] = useState<PostureMetrics>({
     headAngle: 0,
     shoulderSymmetry: 0,
@@ -55,6 +58,11 @@ export default function PostureMonitoring() {
   const [goodPosturePercent, setGoodPosturePercent] = useState(85)
   const [alertsReceived, setAlertsReceived] = useState(0)
   const [correctionSpeed, setCorrectionSpeed] = useState(42)
+
+  // Session tracking
+  const [sessionDataPoints, setSessionDataPoints] = useState<SessionDataPoint[]>([])
+  const [showSessionSummary, setShowSessionSummary] = useState(false)
+  const [sessionAnalytics, setSessionAnalytics] = useState<SessionAnalytics | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -84,25 +92,38 @@ export default function PostureMonitoring() {
     if (!isSessionActive || isPaused) return
 
     setPostureMetrics(prev => {
-      const newScore = Math.max(0, Math.min(100, 
+      const newScore = Math.max(0, Math.min(100,
         prev.overallScore + (Math.random() - 0.6) * 10
       ))
-      
-      const status = newScore >= 80 ? 'excellent' : 
-                    newScore >= 60 ? 'good' : 
+
+      const status = newScore >= 80 ? 'excellent' :
+                    newScore >= 60 ? 'good' :
                     newScore >= 40 ? 'fair' : 'poor'
 
-      return {
+      const newMetrics = {
         headAngle: Math.random() * 20 - 10,
         shoulderSymmetry: Math.random() * 15,
         spineAlignment: Math.random() * 25,
-        distanceFromScreen: 18 + Math.random() * 8,
+        distanceFromScreen: 45 + Math.random() * 20,
         overallScore: Math.round(newScore),
         status
       }
+
+      // Record data point for analytics
+      const dataPoint: SessionDataPoint = {
+        timestamp: Date.now(),
+        score: newScore,
+        quality: status,
+        headForwardAngle: newMetrics.headAngle,
+        shoulderSymmetry: newMetrics.shoulderSymmetry,
+        screenDistance: newMetrics.distanceFromScreen,
+      }
+      setSessionDataPoints(prev => [...prev, dataPoint])
+
+      return newMetrics
     })
 
-    setGoodPosturePercent(prev => Math.max(0, Math.min(100, 
+    setGoodPosturePercent(prev => Math.max(0, Math.min(100,
       prev + (Math.random() - 0.4) * 2
     )))
   }, [isSessionActive, isPaused])
@@ -183,11 +204,65 @@ export default function PostureMonitoring() {
     await startCamera()
     setIsSessionActive(true)
     setSessionTime(0)
+    setSessionStartTime(Date.now())
     setAlertsReceived(0)
     setGoodPosturePercent(85)
+    setSessionDataPoints([]) // Clear previous session data
   }
 
-  const stopSession = () => {
+  const stopSession = async () => {
+    const sessionDuration = Math.floor(sessionTime / 60) // Convert to minutes
+
+    // Generate analytics
+    if (sessionDataPoints.length > 0 && sessionDuration > 0) {
+      const analytics = analyzeSession(sessionDataPoints, sessionDuration)
+      setSessionAnalytics(analytics)
+
+      // Save session to database
+      if (userId) {
+        try {
+          await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId,
+              workstationId: selectedWorkstation?.id,
+              startTime: new Date(sessionStartTime),
+              endTime: new Date(),
+              duration: sessionDuration,
+              overallScore: analytics.excellentPercent + analytics.goodPercent,
+              goodPosturePercent: ((analytics.timeExcellent + analytics.timeGood) / (analytics.timeExcellent + analytics.timeGood + analytics.timeFair + analytics.timePoor)) * 100,
+              timeExcellent: analytics.timeExcellent,
+              timeGood: analytics.timeGood,
+              timeFair: analytics.timeFair,
+              timePoor: analytics.timePoor,
+              alertsReceived: analytics.totalAlerts,
+              postureAlerts: analytics.postureAlerts,
+              breakReminders: analytics.breakReminders,
+              correctionSpeed: analytics.avgCorrectionTime,
+              pointsEarned: analytics.basePoints,
+              bonusPoints: analytics.bonusPoints,
+              mostCommonIssue: analytics.mostCommonIssue,
+              problemAreas: JSON.stringify(analytics.problemAreas),
+              postureTimeline: JSON.stringify(analytics.postureTimeline),
+              longestGoodStreak: analytics.longestGoodStreak,
+              isPersonalRecord: analytics.isPersonalRecord,
+              recordType: analytics.recordType,
+              avgScreenDistance: analytics.avgScreenDistance,
+              lightingQuality: analytics.lightingQuality,
+              aiInsights: JSON.stringify(analytics.insights),
+              recommendations: JSON.stringify(analytics.recommendations),
+            }),
+          })
+        } catch (error) {
+          console.error('Error saving session:', error)
+        }
+      }
+
+      // Show summary
+      setShowSessionSummary(true)
+    }
+
     setIsSessionActive(false)
     setIsPaused(false)
     stopCamera()
@@ -551,6 +626,25 @@ export default function PostureMonitoring() {
           onOpenChange={setShowAddWorkstationDialog}
           userId={userId}
           onWorkstationCreated={handleWorkstationCreated}
+        />
+      )}
+
+      {/* Session Summary */}
+      {showSessionSummary && sessionAnalytics && (
+        <SessionSummary
+          analytics={sessionAnalytics}
+          duration={Math.floor(sessionTime / 60)}
+          onClose={() => setShowSessionSummary(false)}
+          onStartNew={() => {
+            setShowSessionSummary(false)
+            startSession()
+          }}
+          onViewDashboard={() => {
+            window.location.href = '/dashboard'
+          }}
+          onDoExercises={() => {
+            window.location.href = '/exercises'
+          }}
         />
       )}
     </div>
