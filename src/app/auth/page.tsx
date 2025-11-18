@@ -76,7 +76,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 p-6">
         <Logo size="lg" />
@@ -85,13 +85,13 @@ export default function AuthPage() {
       {/* Main Content */}
       <div className="flex items-center justify-center min-h-screen px-4">
         <div className="w-full max-w-md">
-          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur">
+          <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur">
             <CardHeader className="text-center pb-6">
               <div className="mb-4">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                   Welcome to PosturePal
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-gray-600 dark:text-gray-400">
                   Your AI-powered posture coach for a healthier workday
                 </p>
               </div>
@@ -117,7 +117,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signin-email">Email</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signin-email"
                           type="email"
@@ -133,7 +133,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signin-password">Password</Label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signin-password"
                           type={showPassword ? "text" : "password"}
@@ -146,7 +146,7 @@ export default function AuthPage() {
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                          className="absolute right-3 top-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -158,7 +158,7 @@ export default function AuthPage() {
                         <Checkbox id="remember" />
                         <Label htmlFor="remember" className="text-sm">Remember me</Label>
                       </div>
-                      <Button variant="link" className="p-0 h-auto text-sm text-indigo-600" type="button">
+                      <Button variant="link" className="p-0 h-auto text-sm text-indigo-600 dark:text-indigo-400" type="button">
                         Forgot password?
                       </Button>
                     </div>
@@ -180,7 +180,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signup-name">Full Name</Label>
                       <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-name"
                           type="text"
@@ -196,7 +196,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-email"
                           type="email"
@@ -212,7 +212,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signup-password">Password</Label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-password"
                           type={showPassword ? "text" : "password"}
@@ -226,12 +226,12 @@ export default function AuthPage() {
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                          className="absolute right-3 top-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         Must be at least 8 characters with letters and numbers
                       </p>
                     </div>
@@ -239,7 +239,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signup-confirm">Confirm Password</Label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-confirm"
                           type={showPassword ? "text" : "password"}
@@ -256,11 +256,11 @@ export default function AuthPage() {
                       <Checkbox id="terms" required />
                       <Label htmlFor="terms" className="text-sm">
                         I agree to the{' '}
-                        <Button variant="link" className="p-0 h-auto text-indigo-600" type="button">
+                        <Button variant="link" className="p-0 h-auto text-indigo-600 dark:text-indigo-400" type="button">
                           Terms of Service
                         </Button>{' '}
                         and{' '}
-                        <Button variant="link" className="p-0 h-auto text-indigo-600" type="button">
+                        <Button variant="link" className="p-0 h-auto text-indigo-600 dark:text-indigo-400" type="button">
                           Privacy Policy
                         </Button>
                       </Label>
