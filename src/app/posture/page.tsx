@@ -454,7 +454,7 @@ export default function PostureMonitoring() {
 
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium">Haptic Feedback</Label>
-                  <Switch defaultValue={true} />
+                  <Switch defaultChecked={true} />
                 </div>
               </CardContent>
             </Card>
