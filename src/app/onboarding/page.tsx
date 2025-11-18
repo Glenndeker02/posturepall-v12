@@ -12,6 +12,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Logo } from '@/components/logo'
 import { PostureCalibration } from '@/components/features/posture-calibration'
+import { WelcomeCarousel } from '@/components/onboarding/welcome-carousel'
+import { PermissionScreens } from '@/components/onboarding/permission-screens'
+import { GoalCommitment, type GoalData } from '@/components/onboarding/goal-commitment'
 import type { CalibrationData } from '@/lib/ai/types'
 import {
   ChevronRight,
@@ -103,9 +106,12 @@ const goals = [
 ]
 
 export default function Onboarding() {
+  const [showWelcome, setShowWelcome] = useState(true)
+  const [showPermissions, setShowPermissions] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [goalData, setGoalData] = useState<GoalData | null>(null)
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     workEnvironment: '',
     dailySittingHours: 8,
@@ -124,6 +130,27 @@ export default function Onboarding() {
 
   const totalSteps = 7
   const progress = ((currentStep + 1) / totalSteps) * 100
+
+  // Handle welcome completion
+  const handleWelcomeComplete = () => {
+    setShowWelcome(false)
+    setShowPermissions(true)
+  }
+
+  // Handle permissions completion
+  const handlePermissionsComplete = () => {
+    setShowPermissions(false)
+  }
+
+  // Show welcome carousel
+  if (showWelcome) {
+    return <WelcomeCarousel onComplete={handleWelcomeComplete} />
+  }
+
+  // Show permission screens
+  if (showPermissions) {
+    return <PermissionScreens onComplete={handlePermissionsComplete} />
+  }
 
   const updateData = (field: keyof OnboardingData, value: any) => {
     setOnboardingData(prev => ({ ...prev, [field]: value }))
@@ -154,7 +181,7 @@ export default function Onboarding() {
       case 1: return onboardingData.dailySittingHours >= 2
       case 2: return true // Pain areas are optional
       case 3: return onboardingData.workSchedule.startTime && onboardingData.workSchedule.endTime
-      case 4: return onboardingData.primaryGoal !== ''
+      case 4: return goalData !== null // Goal commitment completed
       case 5: return onboardingData.email && onboardingData.name
       case 6: return calibrationData !== null // Calibration must be completed
       default: return false
@@ -174,7 +201,13 @@ export default function Onboarding() {
           dailySittingHours: onboardingData.dailySittingHours,
           painAreas: onboardingData.painAreas,
           workSchedule: onboardingData.workSchedule,
-          userGoals: { primaryGoal: onboardingData.primaryGoal, commitmentLevel: onboardingData.commitmentLevel },
+          userGoals: {
+            primaryGoal: goalData?.template || onboardingData.primaryGoal,
+            commitment: goalData?.commitment,
+            commitmentLevel: onboardingData.commitmentLevel,
+          },
+          breakRemindersEnabled: onboardingData.workSchedule.breakFrequency !== 'never',
+          streakRemindersEnabled: goalData?.reminder || false,
         }),
       })
 
@@ -187,6 +220,7 @@ export default function Onboarding() {
         localStorage.setItem('userId', createdUserId)
         localStorage.setItem('userEmail', userData.user.email)
         localStorage.setItem('userName', userData.user.name)
+        localStorage.setItem('onboardingCompleted', 'true')
 
         // Create default workstation with calibration
         const workstationName = workEnvironments.find(e => e.id === onboardingData.workEnvironment)?.label || 'My Workstation'
@@ -202,6 +236,23 @@ export default function Onboarding() {
             isDefault: true,
           }),
         })
+
+        // Create initial goal if set
+        if (goalData) {
+          await fetch('/api/user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: createdUserId,
+              goal: {
+                title: goalData.customGoal || goalData.template,
+                description: goalData.commitment,
+                targetValue: 100,
+                unit: 'percentage',
+              },
+            }),
+          })
+        }
 
         // Redirect to dashboard
         window.location.href = '/dashboard'
@@ -452,74 +503,18 @@ export default function Onboarding() {
 
       case 4:
         return (
-          <div className="space-y-8">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Target className="w-10 h-10 text-orange-600" />
-              </div>
-              <h2 className="text-3xl font-bold mb-4">What's your main goal?</h2>
-              <p className="text-lg text-gray-600">This helps us personalize your experience</p>
-            </div>
-            
-            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-              {goals.map((goal) => {
-                const Icon = goal.icon
-                const isSelected = onboardingData.primaryGoal === goal.id
-                return (
-                  <button
-                    key={goal.id}
-                    onClick={() => updateData('primaryGoal', goal.id)}
-                    className={`p-6 rounded-2xl border-2 transition-all text-left ${
-                      isSelected 
-                        ? `${goal.color} border-current shadow-lg scale-105` 
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div className="flex items-start space-x-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        isSelected ? goal.color : 'bg-gray-100'
-                      }`}>
-                        <Icon className={`w-6 h-6 ${isSelected ? 'text-current' : 'text-gray-600'}`} />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-2">{goal.label}</h3>
-                        <p className="text-sm text-gray-600">{goal.description}</p>
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <div className="mt-4 flex items-center text-current">
-                        <Check className="w-5 h-5 mr-2" />
-                        <span className="font-medium">Selected</span>
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            
-            <div className="max-w-md mx-auto">
-              <Label className="text-lg font-medium block mb-4">How committed are you?</Label>
-              <RadioGroup
-                value={onboardingData.commitmentLevel}
-                onValueChange={(value) => updateData('commitmentLevel', value)}
-                className="space-y-3"
-              >
-                {[
-                  { value: 'low', label: 'I\'ll try it occasionally', desc: 'Casual approach' },
-                  { value: 'medium', label: 'I\'m serious about this', desc: 'Committed to change' },
-                  { value: 'high', label: 'I\'m all-in, daily commitment', desc: 'Maximum effort' }
-                ].map((option) => (
-                  <div key={option.value} className="flex items-center space-x-3 p-4 rounded-xl border border-gray-200 hover:bg-gray-50">
-                    <RadioGroupItem value={option.value} id={option.value} />
-                    <div className="flex-1">
-                      <Label htmlFor={option.value} className="font-medium">{option.label}</Label>
-                      <p className="text-sm text-gray-600">{option.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-          </div>
+          <GoalCommitment
+            userProfile={{
+              hasPain: onboardingData.painAreas.length > 0,
+              commitmentLevel: onboardingData.commitmentLevel,
+              primaryGoal: onboardingData.primaryGoal,
+            }}
+            onComplete={(data) => {
+              setGoalData(data)
+              // Automatically advance to next step
+              nextStep()
+            }}
+          />
         )
 
       case 5:
