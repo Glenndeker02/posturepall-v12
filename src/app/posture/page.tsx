@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -17,6 +19,9 @@ import { BreakCompletion, type CompleteFeedback } from '@/components/features/br
 import { analyzeSession, type SessionDataPoint, type SessionAnalytics } from '@/lib/analytics/session-analytics'
 import { getBreakScheduler, type BreakType } from '@/lib/breaks/break-scheduler'
 import { createBreakRoutine, type Exercise } from '@/lib/breaks/exercise-library'
+import { usePostureDetection } from '@/hooks/usePostureDetection'
+import { PoseVisualizer } from '@/components/features/pose-visualizer'
+import type { CalibrationData } from '@/lib/ai/types'
 import {
   Camera,
   CameraOff,
@@ -29,7 +34,8 @@ import {
   Minimize2,
   Settings,
   Activity,
-  MapPin
+  MapPin,
+  AlertTriangle
 } from 'lucide-react'
 
 interface PostureMetrics {
@@ -42,7 +48,8 @@ interface PostureMetrics {
 }
 
 export default function PostureMonitoring() {
-  const [userId, setUserId] = useState<string>('')
+  const router = useRouter()
+  const { user, loading } = useAuth()
   const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null)
   const [showAddWorkstationDialog, setShowAddWorkstationDialog] = useState(false)
   const [isSessionActive, setIsSessionActive] = useState(false)
@@ -86,73 +93,86 @@ export default function PostureMonitoring() {
   const breakCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const breakSchedulerRef = useRef<ReturnType<typeof getBreakScheduler> | null>(null)
 
-  // Load userId from localStorage on mount
+  // Initialize posture detection hook
+  const calibrationData: CalibrationData | null = selectedWorkstation?.calibrationData
+    ? (typeof selectedWorkstation.calibrationData === 'string'
+      ? JSON.parse(selectedWorkstation.calibrationData)
+      : selectedWorkstation.calibrationData)
+    : null
+
+  const postureDetection = usePostureDetection(
+    videoRef.current,
+    calibrationData,
+    isSessionActive && !isPaused
+  )
+
+  // Auth protection
   useEffect(() => {
-    const storedUserId = localStorage.getItem('userId')
-    const storedEmail = localStorage.getItem('userEmail')
-
-    if (storedUserId) {
-      setUserId(storedUserId)
-    } else if (storedEmail) {
-      // If we have email but no userId, we'll need to fetch/create user
-      // For now, use email as temporary userId
-      setUserId(storedEmail)
-    } else {
-      // Generate temporary userId for demo purposes
-      const tempId = 'temp-user-' + Math.random().toString(36).substr(2, 9)
-      setUserId(tempId)
-      localStorage.setItem('userId', tempId)
+    if (!loading && !user) {
+      router.push('/auth')
     }
-  }, [])
+  }, [user, loading, router])
 
-  // Simulate posture analysis
-  const analyzePosture = useCallback(() => {
-    if (!isSessionActive || isPaused) return
+  // Update posture metrics from real detection
+  useEffect(() => {
+    if (!postureDetection.currentMetrics || !isSessionActive || isPaused) return
 
-    setPostureMetrics(prev => {
-      const newScore = Math.max(0, Math.min(100,
-        prev.overallScore + (Math.random() - 0.6) * 10
-      ))
+    const metrics = postureDetection.currentMetrics
+    const score = postureDetection.getScore()
 
-      const status: 'excellent' | 'good' | 'fair' | 'poor' =
-        newScore >= 80 ? 'excellent' :
-        newScore >= 60 ? 'good' :
-        newScore >= 40 ? 'fair' : 'poor'
+    const status: 'excellent' | 'good' | 'fair' | 'poor' =
+      score >= 80 ? 'excellent' :
+      score >= 60 ? 'good' :
+      score >= 40 ? 'fair' : 'poor'
 
-      const newMetrics: PostureMetrics = {
-        headAngle: Math.random() * 20 - 10,
-        shoulderSymmetry: Math.random() * 15,
-        spineAlignment: Math.random() * 25,
-        distanceFromScreen: 45 + Math.random() * 20,
-        overallScore: Math.round(newScore),
-        status
+    const newMetrics: PostureMetrics = {
+      headAngle: metrics.headForwardAngle || 0,
+      shoulderSymmetry: 100 - (metrics.shoulderAlignment || 100),
+      spineAlignment: 100 - (metrics.spineAlignment || 100),
+      distanceFromScreen: metrics.screenDistance || 60,
+      overallScore: Math.round(score),
+      status
+    }
+
+    setPostureMetrics(newMetrics)
+
+    // Record data point for analytics
+    const dataPoint: SessionDataPoint = {
+      timestamp: Date.now(),
+      score,
+      quality: status,
+      headForwardAngle: metrics.headForwardAngle || 0,
+      shoulderSymmetry: metrics.shoulderAlignment || 100,
+      screenDistance: metrics.screenDistance || 60,
+    }
+    setSessionDataPoints(prev => [...prev, dataPoint])
+
+    // Calculate good posture percentage from session data
+    const goodCount = sessionDataPoints.filter(dp => dp.score >= 60).length
+    const totalCount = sessionDataPoints.length
+    if (totalCount > 0) {
+      setGoodPosturePercent((goodCount / totalCount) * 100)
+    }
+  }, [postureDetection.currentMetrics, isSessionActive, isPaused, sessionDataPoints])
+
+  // Handle posture alerts
+  useEffect(() => {
+    if (postureDetection.currentAlert && !postureDetection.currentAlert.dismissed) {
+      setAlertsReceived(prev => prev + 1)
+
+      // Play audio alert if enabled
+      if (audioEnabled) {
+        // Could play alert sound here
+        console.log('Posture alert:', postureDetection.currentAlert.type)
       }
-
-      // Record data point for analytics
-      const dataPoint: SessionDataPoint = {
-        timestamp: Date.now(),
-        score: newScore,
-        quality: status,
-        headForwardAngle: newMetrics.headAngle,
-        shoulderSymmetry: newMetrics.shoulderSymmetry,
-        screenDistance: newMetrics.distanceFromScreen,
-      }
-      setSessionDataPoints(prev => [...prev, dataPoint])
-
-      return newMetrics
-    })
-
-    setGoodPosturePercent(prev => Math.max(0, Math.min(100,
-      prev + (Math.random() - 0.4) * 2
-    )))
-  }, [isSessionActive, isPaused])
+    }
+  }, [postureDetection.currentAlert, audioEnabled])
 
   // Session timer
   useEffect(() => {
     if (isSessionActive && !isPaused) {
       intervalRef.current = setInterval(() => {
         setSessionTime(prev => prev + 1)
-        analyzePosture()
       }, 1000)
     } else {
       if (intervalRef.current) {
@@ -165,7 +185,7 @@ export default function PostureMonitoring() {
         clearInterval(intervalRef.current)
       }
     }
-  }, [isSessionActive, isPaused, analyzePosture])
+  }, [isSessionActive, isPaused])
 
   // Break checking - every minute
   useEffect(() => {
@@ -256,7 +276,7 @@ export default function PostureMonitoring() {
     // Convert to full Workstation type for selectedWorkstation
     const fullWorkstation: Workstation = {
       ...workstation,
-      userId,
+      userId: user?.id || '',
       isDefault: false,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -375,13 +395,13 @@ export default function PostureMonitoring() {
       setSessionAnalytics(analytics)
 
       // Save session to database
-      if (userId) {
+      if (user?.id) {
         try {
           await fetch('/api/sessions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              userId,
+              userId: user.id,
               workstationId: selectedWorkstation?.id,
               startTime: new Date(sessionStartTime),
               endTime: new Date(),
@@ -503,7 +523,7 @@ export default function PostureMonitoring() {
           {/* Main Monitoring Area */}
           <div className="lg:col-span-2">
             {/* Workstation Selection - Only show when session is not active */}
-            {!isSessionActive && userId && (
+            {!isSessionActive && user && (
               <Card className="mb-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -516,7 +536,7 @@ export default function PostureMonitoring() {
                 </CardHeader>
                 <CardContent>
                   <WorkstationSelector
-                    userId={userId}
+                    userId={user.id}
                     selectedWorkstationId={selectedWorkstation?.id || null}
                     onWorkstationChange={setSelectedWorkstation}
                     onAddWorkstation={() => setShowAddWorkstationDialog(true)}
@@ -534,13 +554,25 @@ export default function PostureMonitoring() {
                 {/* Camera View or Placeholder */}
                 <div className="relative aspect-video bg-gray-900">
                   {cameraEnabled ? (
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
+                    <>
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Pose Visualizer Overlay */}
+                      {isSessionActive && postureDetection.currentPose && (
+                        <PoseVisualizer
+                          pose={postureDetection.currentPose}
+                          videoElement={videoRef.current}
+                          showSkeleton={true}
+                          showKeypoints={detailedView}
+                          highlightIssues={true}
+                        />
+                      )}
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <div className="text-center">
@@ -588,6 +620,29 @@ export default function PostureMonitoring() {
                             <p className="text-xs opacity-75">Score</p>
                             <p className="font-mono">{postureMetrics.overallScore}</p>
                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Alert Notification */}
+                  {isSessionActive && postureDetection.currentAlert && !postureDetection.currentAlert.dismissed && (
+                    <div className="absolute bottom-20 left-4 right-4">
+                      <div className="bg-amber-500/90 backdrop-blur rounded-lg p-4 shadow-lg animate-pulse">
+                        <div className="flex items-center gap-3 text-white">
+                          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="font-semibold capitalize">{postureDetection.currentAlert.type} Alert</p>
+                            <p className="text-sm opacity-90">{postureDetection.currentAlert.message}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-white hover:bg-white/20"
+                            onClick={() => postureDetection.dismissAlert()}
+                          >
+                            Dismiss
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -675,6 +730,11 @@ export default function PostureMonitoring() {
                   <Activity className="w-5 h-5 mr-2" />
                   Real-time Metrics
                 </CardTitle>
+                {!postureDetection.isModelLoaded && (
+                  <CardDescription>
+                    Loading AI model... {postureDetection.loadingProgress}%
+                  </CardDescription>
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -799,11 +859,11 @@ export default function PostureMonitoring() {
       </div>
 
       {/* Add Workstation Dialog */}
-      {userId && (
+      {user && (
         <AddWorkstationDialog
           open={showAddWorkstationDialog}
           onOpenChange={setShowAddWorkstationDialog}
-          userId={userId}
+          userId={user.id}
           onWorkstationCreated={handleWorkstationCreated}
         />
       )}
