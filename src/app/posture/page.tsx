@@ -11,7 +11,12 @@ import { Slider } from '@/components/ui/slider'
 import { WorkstationSelector, type Workstation } from '@/components/features/workstation-selector'
 import { AddWorkstationDialog } from '@/components/features/add-workstation-dialog'
 import { SessionSummary } from '@/components/features/session-summary'
+import { BreakReminder } from '@/components/features/break-reminder'
+import { BreakRoutine, type BreakFeedback } from '@/components/features/break-routine'
+import { BreakCompletion, type CompleteFeedback } from '@/components/features/break-completion'
 import { analyzeSession, type SessionDataPoint, type SessionAnalytics } from '@/lib/analytics/session-analytics'
+import { getBreakScheduler, type BreakType } from '@/lib/breaks/break-scheduler'
+import { createBreakRoutine, type Exercise } from '@/lib/breaks/exercise-library'
 import {
   Camera,
   CameraOff,
@@ -64,9 +69,22 @@ export default function PostureMonitoring() {
   const [showSessionSummary, setShowSessionSummary] = useState(false)
   const [sessionAnalytics, setSessionAnalytics] = useState<SessionAnalytics | null>(null)
 
+  // Break system
+  const [breakMode, setBreakMode] = useState<'none' | 'warning' | 'reminder' | 'routine' | 'completion'>('none')
+  const [currentBreakType, setCurrentBreakType] = useState<BreakType | null>(null)
+  const [breakExercises, setBreakExercises] = useState<Exercise[]>([])
+  const [completedBreakExercises, setCompletedBreakExercises] = useState<string[]>([])
+  const [breaksFeedback, setBreaksFeedback] = useState<CompleteFeedback[]>([])
+  const [breaksCompleted, setBreaksCompleted] = useState(0)
+  const [breaksSkipped, setBreaksSkipped] = useState(0)
+  const [nextBreakMinutes, setNextBreakMinutes] = useState<number | null>(null)
+  const [maxSnoozesReached, setMaxSnoozesReached] = useState(false)
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const breakCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const breakSchedulerRef = useRef<ReturnType<typeof getBreakScheduler> | null>(null)
 
   // Load userId from localStorage on mount
   useEffect(() => {
@@ -148,6 +166,53 @@ export default function PostureMonitoring() {
     }
   }, [isSessionActive, isPaused, analyzePosture])
 
+  // Break checking - every minute
+  useEffect(() => {
+    if (isSessionActive && !isPaused && breakMode === 'none') {
+      breakCheckIntervalRef.current = setInterval(() => {
+        if (!breakSchedulerRef.current) return
+
+        // Check for 2-minute warning
+        const warningCheck = breakSchedulerRef.current.shouldShowWarning()
+        if (warningCheck?.show) {
+          setCurrentBreakType(warningCheck.type)
+          setBreakMode('warning')
+          setNextBreakMinutes(warningCheck.minutesUntil)
+          return
+        }
+
+        // Check if break should be shown now
+        const breakCheck = breakSchedulerRef.current.shouldShowBreak()
+        if (breakCheck?.show) {
+          setCurrentBreakType(breakCheck.type)
+          setBreakMode('reminder')
+          setMaxSnoozesReached(false)
+          return
+        }
+
+        // Update next break countdown
+        const nextBreak = breakSchedulerRef.current.getNextBreak()
+        setNextBreakMinutes(nextBreak?.minutesUntil ?? null)
+
+        // Check if user has skipped too many breaks
+        if (breakSchedulerRef.current.hasSkippedTooMany()) {
+          // Could show a warning here
+          console.warn('User has skipped 3+ breaks')
+        }
+      }, 60000) // Check every minute
+    } else {
+      if (breakCheckIntervalRef.current) {
+        clearInterval(breakCheckIntervalRef.current)
+      }
+    }
+
+    return () => {
+      if (breakCheckIntervalRef.current) {
+        clearInterval(breakCheckIntervalRef.current)
+      }
+    }
+  }, [isSessionActive, isPaused, breakMode])
+
   // Camera management
   const startCamera = async () => {
     try {
@@ -186,6 +251,72 @@ export default function PostureMonitoring() {
     setShowAddWorkstationDialog(false)
   }
 
+  // Break handlers
+  const handleSnoozeBreak = () => {
+    if (!breakSchedulerRef.current || !currentBreakType) return
+
+    const breakId = `${currentBreakType}-${Date.now()}`
+    const canSnooze = breakSchedulerRef.current.snoozeBreak(breakId)
+
+    if (canSnooze) {
+      setBreakMode('none')
+      setMaxSnoozesReached(false)
+    } else {
+      setMaxSnoozesReached(true)
+    }
+  }
+
+  const handleSkipBreak = () => {
+    if (!breakSchedulerRef.current || !currentBreakType) return
+
+    const breakId = `${currentBreakType}-${Date.now()}`
+    breakSchedulerRef.current.skipBreak(breakId)
+    setBreaksSkipped(prev => prev + 1)
+    setBreakMode('none')
+    setCurrentBreakType(null)
+  }
+
+  const handleStartBreak = () => {
+    if (!currentBreakType) return
+
+    // Pause the posture session
+    setIsPaused(true)
+
+    // Generate exercise routine
+    const problemAreas = sessionDataPoints.length > 0
+      ? ['neck', 'shoulders'] // Could derive from actual posture data
+      : undefined
+    const exercises = createBreakRoutine(currentBreakType, problemAreas)
+    setBreakExercises(exercises)
+    setBreakMode('routine')
+  }
+
+  const handleCompleteBreakRoutine = (completedExercises: string[], feedback: BreakFeedback) => {
+    setCompletedBreakExercises(completedExercises)
+    setBreakMode('completion')
+  }
+
+  const handleFinishBreak = (feedback: CompleteFeedback) => {
+    if (!breakSchedulerRef.current || !currentBreakType) return
+
+    const breakId = `${currentBreakType}-${Date.now()}`
+    breakSchedulerRef.current.completeBreak(breakId)
+
+    setBreaksCompleted(prev => prev + 1)
+    setBreaksFeedback(prev => [...prev, feedback])
+    setBreakMode('none')
+    setCurrentBreakType(null)
+
+    // Resume the posture session
+    setIsPaused(false)
+  }
+
+  const handleExitBreak = () => {
+    setBreakMode('none')
+    setCurrentBreakType(null)
+    setIsPaused(false)
+  }
+
   const startSession = async () => {
     // Check if workstation is selected
     if (!selectedWorkstation) {
@@ -208,6 +339,17 @@ export default function PostureMonitoring() {
     setAlertsReceived(0)
     setGoodPosturePercent(85)
     setSessionDataPoints([]) // Clear previous session data
+
+    // Initialize break scheduler
+    breakSchedulerRef.current = getBreakScheduler({
+      microBreakInterval: 45,
+      standardBreakInterval: 90,
+      extendedBreakInterval: 180,
+    })
+    breakSchedulerRef.current.startSession()
+    setBreaksCompleted(0)
+    setBreaksSkipped(0)
+    setBreakMode('none')
   }
 
   const stopSession = async () => {
@@ -266,6 +408,11 @@ export default function PostureMonitoring() {
     setIsSessionActive(false)
     setIsPaused(false)
     stopCamera()
+
+    // Clean up break scheduler
+    breakSchedulerRef.current = null
+    setBreakMode('none')
+    setCurrentBreakType(null)
   }
 
   const formatTime = (seconds: number) => {
@@ -601,20 +748,38 @@ export default function PostureMonitoring() {
             </Card>
 
             {/* Next Break */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Next Break</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-indigo-600">12:45</p>
-                  <p className="text-sm text-gray-600">Standard Break (5 min)</p>
-                  <Button variant="outline" size="sm" className="mt-2">
-                    Start Now
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            {isSessionActive && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Next Break</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {nextBreakMinutes !== null ? (
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-indigo-600">
+                        {Math.floor(nextBreakMinutes / 60) > 0
+                          ? `${Math.floor(nextBreakMinutes / 60)}h ${nextBreakMinutes % 60}m`
+                          : `${nextBreakMinutes}m`}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {currentBreakType === 'micro' && 'Micro Break (2-3 min)'}
+                        {currentBreakType === 'standard' && 'Standard Break (5-7 min)'}
+                        {currentBreakType === 'extended' && 'Extended Break (10-15 min)'}
+                        {!currentBreakType && 'Next scheduled break'}
+                      </p>
+                      <div className="mt-3 text-xs text-muted-foreground">
+                        <p>Breaks completed: {breaksCompleted}</p>
+                        {breaksSkipped > 0 && <p className="text-amber-600">Skipped: {breaksSkipped}</p>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center text-sm text-muted-foreground">
+                      <p>Calculating next break...</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
@@ -644,6 +809,56 @@ export default function PostureMonitoring() {
           }}
           onDoExercises={() => {
             window.location.href = '/exercises'
+          }}
+        />
+      )}
+
+      {/* Break Warning/Reminder */}
+      {breakMode === 'warning' && currentBreakType && (
+        <BreakReminder
+          type={currentBreakType}
+          mode="warning"
+          minutesUntil={nextBreakMinutes ?? 2}
+          onStartBreak={handleStartBreak}
+          onSnooze={handleSnoozeBreak}
+          onSkip={handleSkipBreak}
+          onDismiss={() => setBreakMode('none')}
+          maxSnoozesReached={maxSnoozesReached}
+        />
+      )}
+
+      {breakMode === 'reminder' && currentBreakType && (
+        <BreakReminder
+          type={currentBreakType}
+          mode="break"
+          onStartBreak={handleStartBreak}
+          onSnooze={handleSnoozeBreak}
+          onSkip={handleSkipBreak}
+          maxSnoozesReached={maxSnoozesReached}
+        />
+      )}
+
+      {/* Break Routine */}
+      {breakMode === 'routine' && breakExercises.length > 0 && (
+        <BreakRoutine
+          exercises={breakExercises}
+          onComplete={handleCompleteBreakRoutine}
+          onExit={handleExitBreak}
+        />
+      )}
+
+      {/* Break Completion */}
+      {breakMode === 'completion' && currentBreakType && (
+        <BreakCompletion
+          breakType={currentBreakType}
+          exercisesCompleted={completedBreakExercises.length}
+          totalExercises={breakExercises.length}
+          duration={currentBreakType === 'micro' ? 3 : currentBreakType === 'standard' ? 6 : 12}
+          pointsEarned={currentBreakType === 'micro' ? 10 : currentBreakType === 'standard' ? 25 : 50}
+          streak={breaksCompleted + 1}
+          onReturnToWork={handleFinishBreak}
+          onDoAnotherBreak={() => {
+            setBreakMode('reminder')
           }}
         />
       )}
