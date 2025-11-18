@@ -24,21 +24,23 @@ model User {
   painAreas         String?  // JSON array of pain areas
   workSchedule      String?  // JSON object with work hours and preferences
   userGoals         String?  // JSON object with user goals
-  calibrationData   String?  // JSON object with posture baseline
+  calibrationData   String?  // JSON object with posture baseline (deprecated - use Workstation)
   qrPairingCode     String?  @unique
   mobileDeviceId    String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  
+
   postureSessions   PostureSession[]
   breakSessions     BreakSession[]
   achievements      UserAchievement[]
   goals             Goal[]
+  workstations      Workstation[]
 }
 
 model PostureSession {
   id                  String   @id @default(cuid())
   userId              String
+  workstationId       String?  // optional: which workstation was used
   startTime           DateTime
   endTime             DateTime?
   duration            Int?     // in minutes
@@ -51,8 +53,9 @@ model PostureSession {
   mobileSynced        Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
-  
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workstation         Workstation? @relation(fields: [workstationId], references: [id], onDelete: SetNull)
 }
 
 model BreakSession {
@@ -121,6 +124,22 @@ model Goal {
   isCompleted Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Workstation {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String   // e.g., "Home Office", "Work Desk", "Study Room"
+  location        String?  // Additional description (e.g., "Main bedroom", "Corner office")
+  calibrationData String?  // JSON CalibrationData object from posture calibration
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postureSessions PostureSession[]
+
+  @@index([userId])
 }

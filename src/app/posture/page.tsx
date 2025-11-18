@@ -8,18 +8,21 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
-import { 
-  Camera, 
-  CameraOff, 
-  Pause, 
-  Play, 
-  Square, 
-  Volume2, 
+import { WorkstationSelector, type Workstation } from '@/components/features/workstation-selector'
+import { AddWorkstationDialog } from '@/components/features/add-workstation-dialog'
+import {
+  Camera,
+  CameraOff,
+  Pause,
+  Play,
+  Square,
+  Volume2,
   VolumeX,
   Maximize2,
   Minimize2,
   Settings,
-  Activity
+  Activity,
+  MapPin
 } from 'lucide-react'
 
 interface PostureMetrics {
@@ -32,6 +35,9 @@ interface PostureMetrics {
 }
 
 export default function PostureMonitoring() {
+  const [userId, setUserId] = useState<string>('')
+  const [selectedWorkstation, setSelectedWorkstation] = useState<Workstation | null>(null)
+  const [showAddWorkstationDialog, setShowAddWorkstationDialog] = useState(false)
   const [isSessionActive, setIsSessionActive] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [cameraEnabled, setCameraEnabled] = useState(false)
@@ -49,10 +55,29 @@ export default function PostureMonitoring() {
   const [goodPosturePercent, setGoodPosturePercent] = useState(85)
   const [alertsReceived, setAlertsReceived] = useState(0)
   const [correctionSpeed, setCorrectionSpeed] = useState(42)
-  
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Load userId from localStorage on mount
+  useEffect(() => {
+    const storedUserId = localStorage.getItem('userId')
+    const storedEmail = localStorage.getItem('userEmail')
+
+    if (storedUserId) {
+      setUserId(storedUserId)
+    } else if (storedEmail) {
+      // If we have email but no userId, we'll need to fetch/create user
+      // For now, use email as temporary userId
+      setUserId(storedEmail)
+    } else {
+      // Generate temporary userId for demo purposes
+      const tempId = 'temp-user-' + Math.random().toString(36).substr(2, 9)
+      setUserId(tempId)
+      localStorage.setItem('userId', tempId)
+    }
+  }, [])
 
   // Simulate posture analysis
   const analyzePosture = useCallback(() => {
@@ -135,7 +160,26 @@ export default function PostureMonitoring() {
     setCameraEnabled(false)
   }
 
+  const handleWorkstationCreated = (workstation: Workstation) => {
+    setSelectedWorkstation(workstation)
+    setShowAddWorkstationDialog(false)
+  }
+
   const startSession = async () => {
+    // Check if workstation is selected
+    if (!selectedWorkstation) {
+      alert('Please select or add a workstation before starting a session')
+      return
+    }
+
+    // Check if workstation is calibrated
+    if (!selectedWorkstation.calibrationData) {
+      const shouldContinue = confirm(
+        'This workstation is not calibrated. Posture tracking won\'t be personalized. Continue anyway?'
+      )
+      if (!shouldContinue) return
+    }
+
     await startCamera()
     setIsSessionActive(true)
     setSessionTime(0)
@@ -222,6 +266,28 @@ export default function PostureMonitoring() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Monitoring Area */}
           <div className="lg:col-span-2">
+            {/* Workstation Selection - Only show when session is not active */}
+            {!isSessionActive && userId && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5" />
+                    Select Workstation
+                  </CardTitle>
+                  <CardDescription>
+                    Choose your current workstation to begin posture monitoring
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <WorkstationSelector
+                    userId={userId}
+                    selectedWorkstationId={selectedWorkstation?.id || null}
+                    onWorkstationChange={setSelectedWorkstation}
+                    onAddWorkstation={() => setShowAddWorkstationDialog(true)}
+                  />
+                </CardContent>
+              </Card>
+            )}
             <Card className="relative overflow-hidden">
               <CardContent className="p-0">
                 {/* Posture Aura Effect */}
@@ -477,6 +543,16 @@ export default function PostureMonitoring() {
           </div>
         </div>
       </div>
+
+      {/* Add Workstation Dialog */}
+      {userId && (
+        <AddWorkstationDialog
+          open={showAddWorkstationDialog}
+          onOpenChange={setShowAddWorkstationDialog}
+          userId={userId}
+          onWorkstationCreated={handleWorkstationCreated}
+        />
+      )}
     </div>
   )
 }

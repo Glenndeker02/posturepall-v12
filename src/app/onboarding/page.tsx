@@ -11,13 +11,15 @@ import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Logo } from '@/components/logo'
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  Building2, 
-  Home, 
-  Coffee, 
-  GraduationCap, 
+import { PostureCalibration } from '@/components/features/posture-calibration'
+import type { CalibrationData } from '@/lib/ai/types'
+import {
+  ChevronRight,
+  ChevronLeft,
+  Building2,
+  Home,
+  Coffee,
+  GraduationCap,
   Gamepad2,
   Monitor,
   Clock,
@@ -30,7 +32,8 @@ import {
   Sparkles,
   User,
   Shield,
-  Calendar
+  Calendar,
+  Camera
 } from 'lucide-react'
 
 interface OnboardingData {
@@ -101,6 +104,8 @@ const goals = [
 
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(0)
+  const [calibrationData, setCalibrationData] = useState<CalibrationData | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     workEnvironment: '',
     dailySittingHours: 8,
@@ -117,7 +122,7 @@ export default function Onboarding() {
     name: ''
   })
 
-  const totalSteps = 6
+  const totalSteps = 7
   const progress = ((currentStep + 1) / totalSteps) * 100
 
   const updateData = (field: keyof OnboardingData, value: any) => {
@@ -151,15 +156,62 @@ export default function Onboarding() {
       case 3: return onboardingData.workSchedule.startTime && onboardingData.workSchedule.endTime
       case 4: return onboardingData.primaryGoal !== ''
       case 5: return onboardingData.email && onboardingData.name
+      case 6: return calibrationData !== null // Calibration must be completed
       default: return false
     }
   }
 
-  const handleComplete = () => {
-    // In a real app, this would save the data and redirect
-    console.log('Onboarding completed:', onboardingData)
-    // Redirect to calibration or dashboard
-    window.location.href = '/calibration'
+  const handleComplete = async () => {
+    try {
+      // Create user account
+      const userResponse = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: onboardingData.email,
+          name: onboardingData.name,
+          workEnvironment: onboardingData.workEnvironment,
+          dailySittingHours: onboardingData.dailySittingHours,
+          painAreas: onboardingData.painAreas,
+          workSchedule: onboardingData.workSchedule,
+          userGoals: { primaryGoal: onboardingData.primaryGoal, commitmentLevel: onboardingData.commitmentLevel },
+        }),
+      })
+
+      const userData = await userResponse.json()
+
+      if (userData.success) {
+        const createdUserId = userData.user.id
+
+        // Save userId to localStorage
+        localStorage.setItem('userId', createdUserId)
+        localStorage.setItem('userEmail', userData.user.email)
+        localStorage.setItem('userName', userData.user.name)
+
+        // Create default workstation with calibration
+        const workstationName = workEnvironments.find(e => e.id === onboardingData.workEnvironment)?.label || 'My Workstation'
+
+        await fetch('/api/workstations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: createdUserId,
+            name: workstationName,
+            location: 'Primary setup',
+            calibrationData: calibrationData,
+            isDefault: true,
+          }),
+        })
+
+        // Redirect to dashboard
+        window.location.href = '/dashboard'
+      } else {
+        alert('Failed to create account. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error completing onboarding:', error)
+      alert('An error occurred. Please try again.')
+    }
   }
 
   const renderStep = () => {
@@ -533,6 +585,34 @@ export default function Onboarding() {
                 </div>
               </div>
             </div>
+          </div>
+        )
+
+      case 6:
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Camera className="w-10 h-10 text-indigo-600" />
+              </div>
+              <h2 className="text-3xl font-bold mb-4">Calibrate Your Posture</h2>
+              <p className="text-lg text-gray-600">
+                Let's establish your optimal sitting position
+              </p>
+            </div>
+
+            <PostureCalibration
+              workstationName="Default Workstation"
+              onComplete={(data) => {
+                setCalibrationData(data)
+              }}
+              onCancel={() => {
+                // Allow skipping calibration
+                if (confirm('Skip calibration? You can calibrate later, but posture tracking won\'t be personalized.')) {
+                  setCalibrationData({} as CalibrationData) // Empty calibration data to allow proceeding
+                }
+              }}
+            />
           </div>
         )
 
