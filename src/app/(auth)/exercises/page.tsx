@@ -1,216 +1,172 @@
-'use client'
+/**
+ * Exercises Page
+ * Shows users how to conduct simple exercises based on posture detection issues
+ * Users are routed here from dashboard based on current posture problems
+ */
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Logo } from '@/components/logo'
-import { 
-  Play, 
-  Clock, 
-  Target, 
-  Zap, 
+'use client';
+
+import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/logo';
+import { ExercisePlayer } from '@/components/exercises/exercise-player';
+import { ExerciseCard } from '@/components/exercises/exercise-card';
+import {
+  EXERCISE_LIBRARY,
+  getExercisesByCategory,
+  type Exercise,
+  type ExerciseCategory,
+} from '@/lib/breaks/exercise-library';
+import {
+  Play,
+  Clock,
+  Target,
+  Zap,
   Heart,
-  Brain,
   Eye,
-  Monitor,
   Timer,
-  CheckCircle,
-  Star,
-  TrendingUp,
   Activity,
   User,
   Home,
   Dumbbell,
   Settings,
-  LogOut
-} from 'lucide-react'
+  LogOut,
+  Search,
+  Sparkles,
+  Filter,
+  TrendingUp,
+} from 'lucide-react';
 
-export default function ExercisesPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [activeExercise, setActiveExercise] = useState(null)
-  const router = useRouter()
+function ExercisesContent() {
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<ExerciseCategory | 'all'>('all');
+  const [difficulty, setDifficulty] = useState<'all' | 'gentle' | 'moderate' | 'deep'>('all');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const problemArea = searchParams.get('area'); // For routing from dashboard
 
-  // Check authentication on mount
+  // Load favorites from localStorage
   useEffect(() => {
-    const hasToken = localStorage.getItem('authToken') || sessionStorage.getItem('userSession')
-    
-    if (!hasToken) {
-      // Not authenticated, redirect to auth page
-      router.push('/auth')
-      return
+    try {
+      const saved = localStorage.getItem('exercise_favorites');
+      if (saved) {
+        setFavorites(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Failed to load favorites:', error);
     }
-    
-    setIsAuthenticated(true)
-  }, [router])
+  }, []);
+
+  // Save favorites to localStorage
+  const toggleFavorite = (exerciseId: string) => {
+    const newFavorites = favorites.includes(exerciseId)
+      ? favorites.filter(id => id !== exerciseId)
+      : [...favorites, exerciseId];
+
+    setFavorites(newFavorites);
+    localStorage.setItem('exercise_favorites', JSON.stringify(newFavorites));
+  };
+
+  // Filter exercises based on search, category, and difficulty
+  const filteredExercises = useMemo(() => {
+    let exercises = EXERCISE_LIBRARY;
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      exercises = getExercisesByCategory(selectedCategory);
+    }
+
+    // Filter by difficulty
+    if (difficulty !== 'all') {
+      exercises = exercises.filter(ex => ex.difficulty === difficulty);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      exercises = exercises.filter(ex =>
+        ex.name.toLowerCase().includes(query) ||
+        ex.description.toLowerCase().includes(query) ||
+        ex.targetArea.toLowerCase().includes(query)
+      );
+    }
+
+    // If routed from dashboard with problem area, filter by that
+    if (problemArea && !searchQuery) {
+      exercises = exercises.filter(ex =>
+        ex.targetArea.toLowerCase().includes(problemArea.toLowerCase()) ||
+        ex.category.toLowerCase().includes(problemArea.toLowerCase())
+      );
+    }
+
+    return exercises;
+  }, [selectedCategory, difficulty, searchQuery, problemArea]);
+
+  const favoriteExercises = useMemo(() => {
+    return EXERCISE_LIBRARY.filter(ex => favorites.includes(ex.id));
+  }, [favorites]);
+
+  const recommendedExercises = useMemo(() => {
+    // If routed from dashboard, show exercises for that problem area
+    if (problemArea) {
+      return EXERCISE_LIBRARY.filter(ex =>
+        ex.targetArea.toLowerCase().includes(problemArea.toLowerCase()) ||
+        ex.category.toLowerCase().includes(problemArea.toLowerCase())
+      ).slice(0, 6);
+    }
+
+    // Otherwise show beginner-friendly exercises
+    return EXERCISE_LIBRARY.filter(ex => ex.difficulty === 'gentle').slice(0, 6);
+  }, [problemArea]);
+
+  // Category stats
+  const categoryStats = useMemo(() => {
+    const stats: Record<string, number> = {
+      all: EXERCISE_LIBRARY.length,
+    };
+
+    ['neck', 'shoulder', 'back', 'chest', 'eye'].forEach(cat => {
+      stats[cat] = getExercisesByCategory(cat as ExerciseCategory).length;
+    });
+
+    return stats;
+  }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken')
-    sessionStorage.removeItem('userSession')
-    router.push('/')
-  }
+    localStorage.removeItem('authToken');
+    sessionStorage.removeItem('userSession');
+    router.push('/');
+  };
 
-  // Show loading while checking authentication
-  if (!isAuthenticated) {
+  const startExercise = (exercise: Exercise) => {
+    setSelectedExercise(exercise);
+  };
+
+  const closeExercise = () => {
+    setSelectedExercise(null);
+  };
+
+  // Show Exercise Player if an exercise is selected
+  if (selectedExercise) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Logo size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
+      <ExercisePlayer
+        exercise={selectedExercise}
+        onClose={closeExercise}
+        onFavorite={() => toggleFavorite(selectedExercise.id)}
+        isFavorite={favorites.includes(selectedExercise.id)}
+      />
+    );
   }
-
-  const exerciseCategories = [
-    { id: 'all', name: 'All Exercises', icon: Activity },
-    { id: 'neck', name: 'Neck & Shoulders', icon: User },
-    { id: 'back', name: 'Back & Spine', icon: TrendingUp },
-    { id: 'eyes', name: 'Eye Relief', icon: Eye },
-    { id: 'full', name: 'Full Body', icon: Heart },
-    { id: 'breathing', name: 'Breathing', icon: Brain },
-  ]
-
-  const exercises = [
-    {
-      id: 1,
-      name: 'Neck Rolls',
-      category: 'neck',
-      duration: '2 min',
-      difficulty: 'Beginner',
-      description: 'Gentle neck rotations to relieve tension',
-      benefits: ['Reduces neck stiffness', 'Improves circulation'],
-      rating: 4.8,
-      timesCompleted: 24,
-      favorite: true
-    },
-    {
-      id: 2,
-      name: 'Shoulder Blade Squeeze',
-      category: 'neck',
-      duration: '3 min',
-      difficulty: 'Beginner',
-      description: 'Strengthen upper back and improve posture',
-      benefits: ['Corrects rounded shoulders', 'Strengthens upper back'],
-      rating: 4.9,
-      timesCompleted: 18,
-      favorite: false
-    },
-    {
-      id: 3,
-      name: 'Seated Cat-Cow',
-      category: 'back',
-      duration: '4 min',
-      difficulty: 'Beginner',
-      description: 'Gentle spinal movement for flexibility',
-      benefits: ['Increases spinal mobility', 'Relieves back tension'],
-      rating: 4.7,
-      timesCompleted: 15,
-      favorite: true
-    },
-    {
-      id: 4,
-      name: '20-20-20 Eye Rule',
-      category: 'eyes',
-      duration: '1 min',
-      difficulty: 'Beginner',
-      description: 'Rest your eyes from screen strain',
-      benefits: ['Reduces eye strain', 'Prevents headaches'],
-      rating: 4.6,
-      timesCompleted: 32,
-      favorite: false
-    },
-    {
-      id: 5,
-      name: 'Chest Opener Stretch',
-      category: 'back',
-      duration: '3 min',
-      difficulty: 'Intermediate',
-      description: 'Open chest and reverse hunching',
-      benefits: ['Improves posture', 'Opens chest muscles'],
-      rating: 4.8,
-      timesCompleted: 12,
-      favorite: true
-    },
-    {
-      id: 6,
-      name: 'Box Breathing',
-      category: 'breathing',
-      duration: '5 min',
-      difficulty: 'Beginner',
-      description: 'Calming breathing technique for focus',
-      benefits: ['Reduces stress', 'Improves focus'],
-      rating: 4.9,
-      timesCompleted: 28,
-      favorite: false
-    },
-    {
-      id: 7,
-      name: 'Wrist & Finger Stretches',
-      category: 'full',
-      duration: '3 min',
-      difficulty: 'Beginner',
-      description: 'Prevent carpal tunnel and relieve wrist pain',
-      benefits: ['Prevents wrist strain', 'Improves flexibility'],
-      rating: 4.5,
-      timesCompleted: 20,
-      favorite: false
-    },
-    {
-      id: 8,
-      name: 'Standing Desk Routine',
-      category: 'full',
-      duration: '7 min',
-      difficulty: 'Intermediate',
-      description: 'Full body routine for standing breaks',
-      benefits: ['Full body movement', 'Energy boost'],
-      rating: 4.7,
-      timesCompleted: 8,
-      favorite: true
-    }
-  ]
-
-  const filteredExercises = selectedCategory === 'all' 
-    ? exercises 
-    : exercises.filter(ex => ex.category === selectedCategory)
-
-  const quickRoutines = [
-    {
-      name: 'Quick Energy Boost',
-      duration: '5 min',
-      exercises: 3,
-      focus: 'Neck & Shoulders',
-      color: 'bg-blue-100 text-blue-600'
-    },
-    {
-      name: 'Stress Relief',
-      duration: '8 min',
-      exercises: 4,
-      focus: 'Breathing & Gentle Stretch',
-      color: 'bg-green-100 text-green-600'
-    },
-    {
-      name: 'Posture Reset',
-      duration: '10 min',
-      exercises: 5,
-      focus: 'Full Body Alignment',
-      color: 'bg-purple-100 text-purple-600'
-    },
-    {
-      name: 'Eye Care Break',
-      duration: '3 min',
-      exercises: 2,
-      focus: 'Eye Relief',
-      color: 'bg-orange-100 text-orange-600'
-    }
-  ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Dashboard Navigation */}
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -259,309 +215,232 @@ export default function ExercisesPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Exercise Library</h1>
-          <p className="text-gray-600">Guided stretches and exercises to improve your posture and well-being</p>
+          {problemArea ? (
+            <p className="text-gray-600">
+              Recommended exercises for your {problemArea} issues
+            </p>
+          ) : (
+            <p className="text-gray-600">
+              Guided stretches and exercises to improve your posture and well-being
+            </p>
+          )}
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6 text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Activity className="w-6 h-6 text-blue-600" />
+        {/* Search and Filters */}
+        <Card className="bg-white shadow-sm mb-8">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Input
+                  placeholder="Search exercises..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 rounded-xl"
+                />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Exercises Completed</h3>
-              <p className="text-2xl font-bold text-gray-900">156</p>
-              <p className="text-sm text-green-600">+12 this week</p>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardContent className="p-6 text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Timer className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Total Time</h3>
-              <p className="text-2xl font-bold text-gray-900">8h 24m</p>
-              <p className="text-sm text-gray-600">This month</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6 text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Target className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Current Streak</h3>
-              <p className="text-2xl font-bold text-gray-900">7 days</p>
-              <p className="text-sm text-gray-600">Keep it up!</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6 text-center">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-6 h-6 text-orange-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-1">Energy Boost</h3>
-              <p className="text-2xl font-bold text-gray-900">89%</p>
-              <p className="text-sm text-gray-600">Effectiveness</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="exercises" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="exercises">Individual Exercises</TabsTrigger>
-            <TabsTrigger value="routines">Quick Routines</TabsTrigger>
-            <TabsTrigger value="recommendations">Recommended</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="exercises" className="space-y-6">
-            {/* Category Filter */}
-            <div className="flex flex-wrap gap-2">
-              {exerciseCategories.map((category) => (
+              {/* Difficulty Filter */}
+              <div className="flex gap-2">
                 <Button
-                  key={category.id}
-                  variant={selectedCategory === category.id ? "default" : "outline"}
+                  variant={difficulty === 'all' ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedCategory(category.id)}
-                  className="flex items-center"
+                  onClick={() => setDifficulty('all')}
+                  className="rounded-xl"
                 >
-                  <category.icon className="w-4 h-4 mr-2" />
-                  {category.name}
+                  All Levels
                 </Button>
-              ))}
+                <Button
+                  variant={difficulty === 'gentle' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDifficulty('gentle')}
+                  className="rounded-xl"
+                >
+                  Gentle
+                </Button>
+                <Button
+                  variant={difficulty === 'moderate' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDifficulty('moderate')}
+                  className="rounded-xl"
+                >
+                  Moderate
+                </Button>
+                <Button
+                  variant={difficulty === 'deep' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDifficulty('deep')}
+                  className="rounded-xl"
+                >
+                  Deep
+                </Button>
+              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Exercise Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredExercises.map((exercise) => (
-                <Card key={exercise.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{exercise.name}</CardTitle>
-                        <CardDescription className="mt-1">{exercise.description}</CardDescription>
-                      </div>
-                      {exercise.favorite && (
-                        <Star className="w-5 h-5 text-yellow-400 fill-current" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {/* Exercise Meta */}
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center">
-                            <Clock className="w-4 h-4 mr-1 text-gray-400" />
-                            {exercise.duration}
-                          </div>
-                          <Badge variant="secondary" className="text-xs">
-                            {exercise.difficulty}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center">
-                          <Star className="w-4 h-4 mr-1 text-yellow-400" />
-                          <span className="text-gray-600">{exercise.rating}</span>
-                        </div>
-                      </div>
+        {/* Favorites Section */}
+        {favoriteExercises.length > 0 && (
+          <Card className="bg-white shadow-sm mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                Your Favorites
+              </CardTitle>
+              <CardDescription>Quick access to your saved exercises</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {favoriteExercises.map((exercise) => (
+                  <ExerciseCard
+                    key={exercise.id}
+                    exercise={exercise}
+                    onStart={startExercise}
+                    onFavorite={toggleFavorite}
+                    isFavorite={true}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-                      {/* Benefits */}
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-gray-900">Benefits:</p>
-                        <ul className="text-sm text-gray-600 space-y-1">
-                          {exercise.benefits.map((benefit, index) => (
-                            <li key={index} className="flex items-center">
-                              <CheckCircle className="w-3 h-3 mr-2 text-green-500" />
-                              {benefit}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+        {/* Recommended Section */}
+        {recommendedExercises.length > 0 && !searchQuery && (
+          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-md mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-indigo-600" />
+                {problemArea ? `Recommended for ${problemArea}` : 'Recommended For You'}
+              </CardTitle>
+              <CardDescription>
+                {problemArea
+                  ? 'These exercises target your specific problem areas'
+                  : 'Gentle exercises perfect for beginners'
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {recommendedExercises.map((exercise) => (
+                  <ExerciseCard
+                    key={exercise.id}
+                    exercise={exercise}
+                    onStart={startExercise}
+                    onFavorite={toggleFavorite}
+                    isFavorite={favorites.includes(exercise.id)}
+                    highlighted
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-                      {/* Progress */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Completed</span>
-                          <span className="font-medium">{exercise.timesCompleted} times</span>
-                        </div>
-                        <Progress value={(exercise.timesCompleted / 30) * 100} className="h-2" />
-                      </div>
+        {/* Exercise Library by Category */}
+        <Card className="bg-white shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-indigo-600" />
+              Exercise Library
+            </CardTitle>
+            <CardDescription>Browse by body area or difficulty level</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={selectedCategory} onValueChange={(val) => setSelectedCategory(val as any)} className="w-full">
+              <TabsList className="grid w-full grid-cols-6 mb-6">
+                <TabsTrigger value="all" className="text-xs md:text-sm">
+                  All ({categoryStats.all})
+                </TabsTrigger>
+                <TabsTrigger value="neck" className="text-xs md:text-sm">
+                  Neck ({categoryStats.neck})
+                </TabsTrigger>
+                <TabsTrigger value="shoulder" className="text-xs md:text-sm">
+                  Shoulders ({categoryStats.shoulder})
+                </TabsTrigger>
+                <TabsTrigger value="back" className="text-xs md:text-sm">
+                  Back ({categoryStats.back})
+                </TabsTrigger>
+                <TabsTrigger value="chest" className="text-xs md:text-sm">
+                  Chest ({categoryStats.chest})
+                </TabsTrigger>
+                <TabsTrigger value="eye" className="text-xs md:text-sm">
+                  Eyes ({categoryStats.eye})
+                </TabsTrigger>
+              </TabsList>
 
-                      {/* Action Button */}
-                      <Button className="w-full">
-                        <Play className="w-4 h-4 mr-2" />
-                        Start Exercise
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="routines" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {quickRoutines.map((routine, index) => (
-                <Card key={index} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-12 h-12 ${routine.color} rounded-full flex items-center justify-center`}>
-                        <Timer className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <CardTitle>{routine.name}</CardTitle>
-                        <CardDescription>{routine.focus}</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4 text-sm text-gray-600">
-                          <div className="flex items-center">
-                            <Clock className="w-4 h-4 mr-1" />
-                            {routine.duration}
-                          </div>
-                          <div className="flex items-center">
-                            <Activity className="w-4 h-4 mr-1" />
-                            {routine.exercises} exercises
-                          </div>
-                        </div>
-                      </div>
-
-                      <Button className="w-full">
-                        <Play className="w-4 h-4 mr-2" />
-                        Start Routine
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Custom Routine Builder */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Create Your Own Routine</CardTitle>
-                <CardDescription>Combine exercises to create a personalized routine</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Target className="w-8 h-8 text-gray-400" />
+              <TabsContent value={selectedCategory} className="mt-0">
+                {filteredExercises.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredExercises.map((exercise) => (
+                      <ExerciseCard
+                        key={exercise.id}
+                        exercise={exercise}
+                        onStart={startExercise}
+                        onFavorite={toggleFavorite}
+                        isFavorite={favorites.includes(exercise.id)}
+                      />
+                    ))}
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Build Custom Routine</h3>
-                  <p className="text-gray-600 mb-4">Mix and match exercises to create your perfect break routine</p>
-                  <Button>
-                    <Target className="w-4 h-4 mr-2" />
-                    Create Routine
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="recommendations" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* AI Recommendations */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Brain className="w-5 h-5 mr-2" />
-                    AI-Powered Recommendations
-                  </CardTitle>
-                  <CardDescription>Based on your posture patterns and work habits</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <h4 className="font-medium text-blue-900 mb-2">Focus on Neck Relief</h4>
-                      <p className="text-sm text-blue-700 mb-3">Forward head posture detected 65% of the time</p>
-                      <div className="space-y-2">
-                        <Button size="sm" variant="outline" className="w-full justify-start">
-                          <Play className="w-4 h-4 mr-2" />
-                          Neck Rolls (2 min)
-                        </Button>
-                        <Button size="sm" variant="outline" className="w-full justify-start">
-                          <Play className="w-4 h-4 mr-2" />
-                          Chin Tucks (3 min)
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <h4 className="font-medium text-green-900 mb-2">Afternoon Energy Boost</h4>
-                      <p className="text-sm text-green-700 mb-3">Your posture declines after 2 PM</p>
-                      <Button size="sm" className="w-full">
-                        <Play className="w-4 h-4 mr-2" />
-                        Start 5-min Routine
-                      </Button>
-                    </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Filter className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      No exercises found
+                    </h3>
+                    <p className="text-gray-600">
+                      Try adjusting your filters or search query
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Time-based Suggestions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Clock className="w-5 h-5 mr-2" />
-                    Perfect for Right Now
-                  </CardTitle>
-                  <CardDescription>Based on current time and your patterns</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-orange-50 rounded-lg">
-                      <h4 className="font-medium text-orange-900 mb-2">Quick Eye Break</h4>
-                      <p className="text-sm text-orange-700 mb-3">You've been working for 45 minutes</p>
-                      <Button size="sm" className="w-full">
-                        <Eye className="w-4 h-4 mr-2" />
-                        20-20-20 Eye Rule
-                      </Button>
-                    </div>
-
-                    <div className="p-4 bg-purple-50 rounded-lg">
-                      <h4 className="font-medium text-purple-900 mb-2">Stress Relief</h4>
-                      <p className="text-sm text-purple-700 mb-3">Take a moment to breathe and reset</p>
-                      <Button size="sm" variant="outline" className="w-full">
-                        <Brain className="w-4 h-4 mr-2" />
-                        Box Breathing (5 min)
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Progress Tracking */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Exercise Impact</CardTitle>
-                <CardDescription>How exercises are improving your posture</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">-42%</div>
-                    <p className="text-sm text-gray-600">Neck pain reduction</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">+28%</div>
-                    <p className="text-sm text-gray-600">Posture score improvement</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">+35%</div>
-                    <p className="text-sm text-gray-600">Energy level increase</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  )
+  );
+}
+
+export default function ExercisesPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
+
+  // Check authentication on mount
+  useEffect(() => {
+    const hasToken = localStorage.getItem('authToken') || sessionStorage.getItem('userSession');
+
+    if (!hasToken) {
+      router.push('/auth');
+      return;
+    }
+
+    setIsAuthenticated(true);
+  }, [router]);
+
+  // Show loading while checking authentication
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Logo size="lg" className="mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Logo size="lg" className="mx-auto mb-4" />
+          <p className="text-gray-600">Loading exercises...</p>
+        </div>
+      </div>
+    }>
+      <ExercisesContent />
+    </Suspense>
+  );
 }
