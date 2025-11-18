@@ -59,6 +59,7 @@ model User {
   goals             Goal[]
   workstations      Workstation[]
   dailyStats        DailyStats[]
+  pairedDevices     PairedDevice[]
 }
 
 model PostureSession {
@@ -241,4 +242,24 @@ model DailyStats {
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+model PairedDevice {
+  id              String   @id @default(cuid())
+  userId          String
+  deviceId        String   @unique // unique identifier from mobile app
+  deviceName      String   // e.g., "iPhone 14 Pro", "Samsung Galaxy S23"
+  deviceType      String   // ios, android
+  pairingCode     String   @unique // temporary code used for pairing
+  fcmToken        String?  // Firebase Cloud Messaging token for push notifications
+  isActive        Boolean  @default(true)
+  lastSyncedAt    DateTime @default(now())
+  lastActiveAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([pairingCode])
 }
