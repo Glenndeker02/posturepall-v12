@@ -166,31 +166,31 @@ function ExercisesContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950/30">
       {/* Dashboard Navigation */}
-      <nav className="bg-white border-b border-gray-200">
+      <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Logo size="md" />
               <div className="ml-10 flex items-baseline space-x-4">
-                <Button variant="ghost" className="text-gray-600 hover:text-gray-900" asChild>
+                <Button variant="ghost" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100" asChild>
                   <a href="/dashboard">
                     <Home className="w-4 h-4 mr-2" />
                     Dashboard
                   </a>
                 </Button>
-                <Button variant="ghost" className="text-gray-600 hover:text-gray-900" asChild>
+                <Button variant="ghost" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100" asChild>
                   <a href="/insights">
                     <Activity className="w-4 h-4 mr-2" />
                     Insights
                   </a>
                 </Button>
-                <Button variant="ghost" className="text-gray-900 bg-gray-100">
+                <Button variant="ghost" className="text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-800">
                   <Dumbbell className="w-4 h-4 mr-2" />
                   Exercises
                 </Button>
-                <Button variant="ghost" className="text-gray-600 hover:text-gray-900" asChild>
+                <Button variant="ghost" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100" asChild>
                   <a href="/settings">
                     <Settings className="w-4 h-4 mr-2" />
                     Settings
@@ -199,10 +199,10 @@ function ExercisesContent() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">S</span>
+              <div className="w-8 h-8 bg-black dark:bg-white rounded-full flex items-center justify-center">
+                <span className="text-white dark:text-black text-sm font-medium">S</span>
               </div>
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="dark:text-gray-400 dark:hover:text-gray-100">
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </Button>
@@ -214,25 +214,25 @@ function ExercisesContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Exercise Library</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Exercise Library</h1>
           {problemArea ? (
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400">
               Recommended exercises for your {problemArea} issues
             </p>
           ) : (
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400">
               Guided stretches and exercises to improve your posture and well-being
             </p>
           )}
         </div>
 
         {/* Search and Filters */}
-        <Card className="bg-white shadow-sm mb-8">
+        <Card className="bg-white dark:bg-gray-900 shadow-sm mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-4">
               {/* Search */}
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
                 <Input
                   placeholder="Search exercises..."
                   value={searchQuery}
@@ -282,13 +282,13 @@ function ExercisesContent() {
 
         {/* Favorites Section */}
         {favoriteExercises.length > 0 && (
-          <Card className="bg-white shadow-sm mb-8">
+          <Card className="bg-white dark:bg-gray-900 shadow-sm mb-8">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 dark:text-gray-100">
                 <Heart className="w-5 h-5 text-red-500 fill-red-500" />
                 Your Favorites
               </CardTitle>
-              <CardDescription>Quick access to your saved exercises</CardDescription>
+              <CardDescription className="dark:text-gray-400">Quick access to your saved exercises</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -308,13 +308,13 @@ function ExercisesContent() {
 
         {/* Recommended Section */}
         {recommendedExercises.length > 0 && !searchQuery && (
-          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 shadow-md mb-8">
+          <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border-2 border-indigo-200 dark:border-indigo-900 shadow-md mb-8">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-indigo-600" />
+              <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+                <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-500" />
                 {problemArea ? `Recommended for ${problemArea}` : 'Recommended For You'}
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="dark:text-gray-400">
                 {problemArea
                   ? 'These exercises target your specific problem areas'
                   : 'Gentle exercises perfect for beginners'
@@ -339,13 +339,13 @@ function ExercisesContent() {
         )}
 
         {/* Exercise Library by Category */}
-        <Card className="bg-white shadow-sm">
+        <Card className="bg-white dark:bg-gray-900 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-indigo-600" />
+            <CardTitle className="flex items-center gap-2 dark:text-gray-100">
+              <Target className="w-5 h-5 text-indigo-600 dark:text-indigo-500" />
               Exercise Library
             </CardTitle>
-            <CardDescription>Browse by body area or difficulty level</CardDescription>
+            <CardDescription className="dark:text-gray-400">Browse by body area or difficulty level</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs value={selectedCategory} onValueChange={(val) => setSelectedCategory(val as any)} className="w-full">
@@ -385,11 +385,11 @@ function ExercisesContent() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <Filter className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    <Filter className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
                       No exercises found
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-gray-600 dark:text-gray-400">
                       Try adjusting your filters or search query
                     </p>
                   </div>
@@ -422,10 +422,10 @@ export default function ExercisesPage() {
   // Show loading while checking authentication
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <Logo size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -433,10 +433,10 @@ export default function ExercisesPage() {
 
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <Logo size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600">Loading exercises...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading exercises...</p>
         </div>
       </div>
     }>
