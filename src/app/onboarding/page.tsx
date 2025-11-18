@@ -15,6 +15,7 @@ import { PostureCalibration } from '@/components/features/posture-calibration'
 import { WelcomeCarousel } from '@/components/onboarding/welcome-carousel'
 import { PermissionScreens } from '@/components/onboarding/permission-screens'
 import { GoalCommitment, type GoalData } from '@/components/onboarding/goal-commitment'
+import { QRCodePairing } from '@/components/pairing/qr-code-pairing'
 import type { CalibrationData } from '@/lib/ai/types'
 import {
   ChevronRight,
@@ -36,7 +37,8 @@ import {
   User,
   Shield,
   Calendar,
-  Camera
+  Camera,
+  Smartphone
 } from 'lucide-react'
 
 interface OnboardingData {
@@ -128,7 +130,7 @@ export default function Onboarding() {
     name: ''
   })
 
-  const totalSteps = 7
+  const totalSteps = 8
   const progress = ((currentStep + 1) / totalSteps) * 100
 
   // Handle welcome completion
@@ -163,34 +165,19 @@ export default function Onboarding() {
     }))
   }
 
-  const nextStep = () => {
+  const nextStep = async () => {
+    // Create user account after step 5 (when we have email and name)
+    if (currentStep === 5 && onboardingData.email && onboardingData.name && !userId) {
+      await createUserAccount()
+    }
+
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1)
     }
   }
 
-  const prevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1)
-    }
-  }
-
-  const canProceed = () => {
-    switch (currentStep) {
-      case 0: return onboardingData.workEnvironment !== ''
-      case 1: return onboardingData.dailySittingHours >= 2
-      case 2: return true // Pain areas are optional
-      case 3: return onboardingData.workSchedule.startTime && onboardingData.workSchedule.endTime
-      case 4: return goalData !== null // Goal commitment completed
-      case 5: return onboardingData.email && onboardingData.name
-      case 6: return calibrationData !== null // Calibration must be completed
-      default: return false
-    }
-  }
-
-  const handleComplete = async () => {
+  const createUserAccount = async () => {
     try {
-      // Create user account
       const userResponse = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,51 +201,86 @@ export default function Onboarding() {
       const userData = await userResponse.json()
 
       if (userData.success) {
-        const createdUserId = userData.user.id
-
-        // Save userId to localStorage
-        localStorage.setItem('userId', createdUserId)
+        setUserId(userData.user.id)
+        // Save to localStorage for persistence
+        localStorage.setItem('userId', userData.user.id)
         localStorage.setItem('userEmail', userData.user.email)
         localStorage.setItem('userName', userData.user.name)
-        localStorage.setItem('onboardingCompleted', 'true')
+      }
+    } catch (error) {
+      console.error('Error creating user account:', error)
+    }
+  }
 
-        // Create default workstation with calibration
-        const workstationName = workEnvironments.find(e => e.id === onboardingData.workEnvironment)?.label || 'My Workstation'
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
 
-        await fetch('/api/workstations', {
+  const canProceed = () => {
+    switch (currentStep) {
+      case 0: return onboardingData.workEnvironment !== ''
+      case 1: return onboardingData.dailySittingHours >= 2
+      case 2: return true // Pain areas are optional
+      case 3: return onboardingData.workSchedule.startTime && onboardingData.workSchedule.endTime
+      case 4: return goalData !== null // Goal commitment completed
+      case 5: return onboardingData.email && onboardingData.name
+      case 6: return calibrationData !== null // Calibration must be completed
+      case 7: return true // Mobile pairing is optional
+      default: return false
+    }
+  }
+
+  const handleComplete = async () => {
+    try {
+      // If user account wasn't created yet (shouldn't happen), create it now
+      if (!userId) {
+        await createUserAccount()
+      }
+
+      if (!userId) {
+        alert('Failed to create account. Please try again.')
+        return
+      }
+
+      // Mark onboarding as completed
+      localStorage.setItem('onboardingCompleted', 'true')
+
+      // Create default workstation with calibration
+      const workstationName = workEnvironments.find(e => e.id === onboardingData.workEnvironment)?.label || 'My Workstation'
+
+      await fetch('/api/workstations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId,
+          name: workstationName,
+          location: 'Primary setup',
+          calibrationData: calibrationData,
+          isDefault: true,
+        }),
+      })
+
+      // Create initial goal if set
+      if (goalData) {
+        await fetch('/api/user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: createdUserId,
-            name: workstationName,
-            location: 'Primary setup',
-            calibrationData: calibrationData,
-            isDefault: true,
+            userId: userId,
+            goal: {
+              title: goalData.customGoal || goalData.template,
+              description: goalData.commitment,
+              targetValue: 100,
+              unit: 'percentage',
+            },
           }),
         })
-
-        // Create initial goal if set
-        if (goalData) {
-          await fetch('/api/user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: createdUserId,
-              goal: {
-                title: goalData.customGoal || goalData.template,
-                description: goalData.commitment,
-                targetValue: 100,
-                unit: 'percentage',
-              },
-            }),
-          })
-        }
-
-        // Redirect to dashboard
-        window.location.href = '/dashboard'
-      } else {
-        alert('Failed to create account. Please try again.')
       }
+
+      // Redirect to dashboard
+      window.location.href = '/dashboard'
     } catch (error) {
       console.error('Error completing onboarding:', error)
       alert('An error occurred. Please try again.')
@@ -608,6 +630,70 @@ export default function Onboarding() {
                 }
               }}
             />
+          </div>
+        )
+
+      case 7:
+        return (
+          <div className="space-y-6">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Smartphone className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold mb-4">Connect Your Mobile App</h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Sync your posture data with our mobile app to get personalized exercise recommendations
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-indigo-100 max-w-2xl mx-auto mb-6">
+              <h3 className="font-semibold text-indigo-900 mb-3 flex items-center">
+                <Sparkles className="w-5 h-5 mr-2" />
+                Why Connect?
+              </h3>
+              <div className="space-y-2 text-sm text-indigo-700">
+                <div className="flex items-start">
+                  <Check className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                  <span>Get personalized deep stretches and home exercises based on your posture data</span>
+                </div>
+                <div className="flex items-start">
+                  <Check className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                  <span>Access your analytics and progress anywhere</span>
+                </div>
+                <div className="flex items-start">
+                  <Check className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                  <span>Sync exercise completions and track your wellness journey</span>
+                </div>
+              </div>
+            </div>
+
+            {userId ? (
+              <QRCodePairing
+                userId={userId}
+                onPaired={(deviceInfo) => {
+                  console.log('Device paired:', deviceInfo)
+                  // Automatically advance to completion after successful pairing
+                  setTimeout(() => handleComplete(), 1500)
+                }}
+                compact={false}
+              />
+            ) : (
+              <div className="text-center p-8 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p className="text-yellow-800">
+                  Please complete the previous steps to enable mobile pairing
+                </p>
+              </div>
+            )}
+
+            <div className="text-center mt-6">
+              <Button
+                variant="ghost"
+                onClick={handleComplete}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Skip for now - I'll connect later
+              </Button>
+            </div>
           </div>
         )
 

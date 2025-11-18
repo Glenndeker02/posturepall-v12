@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Logo } from '@/components/logo'
 import { useAuth } from '@/contexts/AuthContext'
+import { MobilePairingDialog } from '@/components/pairing/mobile-pairing-dialog'
 import {
   Play,
   Coffee,
@@ -24,7 +25,8 @@ import {
   Zap,
   AlertCircle,
   ArrowRight,
-  Dumbbell
+  Dumbbell,
+  Smartphone
 } from 'lucide-react'
 
 interface DashboardData {
@@ -50,6 +52,7 @@ export default function Dashboard() {
   const [greeting, setGreeting] = useState('')
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [showPairingDialog, setShowPairingDialog] = useState(false)
 
   // Set greeting based on time of day
   useEffect(() => {
@@ -268,10 +271,32 @@ export default function Dashboard() {
                   <div className="text-xs text-gray-500">Set your ideal posture</div>
                 </div>
               </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start border-indigo-200 hover:bg-indigo-50"
+                size="lg"
+                onClick={() => setShowPairingDialog(true)}
+              >
+                <Smartphone className="w-5 h-5 mr-3 text-indigo-600" />
+                <div className="text-left">
+                  <div className="font-semibold">Connect Mobile App</div>
+                  <div className="text-xs text-gray-500">Sync with your phone</div>
+                </div>
+              </Button>
             </CardContent>
           </Card>
         </div>
       </section>
+
+      {/* Mobile Pairing Dialog */}
+      {user && (
+        <MobilePairingDialog
+          open={showPairingDialog}
+          onOpenChange={setShowPairingDialog}
+          userId={user.id}
+        />
+      )}
 
       {/* SECTION 2: TODAY'S STATS */}
       <section className="mb-8">
