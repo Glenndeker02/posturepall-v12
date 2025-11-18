@@ -92,20 +92,20 @@ export default function Dashboard() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <Logo size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     )
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600'
-    if (score >= 70) return 'text-yellow-600'
-    if (score >= 60) return 'text-orange-600'
-    return 'text-red-600'
+    if (score >= 80) return 'text-green-600 dark:text-green-500'
+    if (score >= 70) return 'text-yellow-600 dark:text-yellow-500'
+    if (score >= 60) return 'text-orange-600 dark:text-orange-500'
+    return 'text-red-600 dark:text-red-500'
   }
 
   const getScoreLabel = (score: number) => {
@@ -125,11 +125,11 @@ export default function Dashboard() {
       <section className="mb-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-1">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
               {greeting}, {user.name || 'there'}! 👋
             </h2>
             {dashboardData && dashboardData.currentStreak > 0 && (
-              <p className="text-lg text-gray-600">
+              <p className="text-lg text-gray-600 dark:text-gray-400">
                 You're on a {dashboardData.currentStreak}-day streak. Keep the momentum going!
               </p>
             )}
@@ -143,7 +143,7 @@ export default function Dashboard() {
           {/* Today's Posture Score */}
           <Card>
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6 text-center">TODAY'S POSTURE SCORE</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 text-center">TODAY'S POSTURE SCORE</h3>
 
               {loading ? (
                 <div className="flex items-center justify-center h-64">
@@ -154,7 +154,7 @@ export default function Dashboard() {
                   {/* Circular Progress Ring */}
                   <div className="relative w-48 h-48 mx-auto mb-6">
                     <svg className="w-48 h-48 transform -rotate-90">
-                      <circle cx="96" cy="96" r="88" stroke="#e5e7eb" strokeWidth="12" fill="none" />
+                      <circle cx="96" cy="96" r="88" className="stroke-gray-200 dark:stroke-gray-700" strokeWidth="12" fill="none" />
                       <circle
                         cx="96" cy="96" r="88"
                         stroke={todayScore >= 80 ? "url(#gradient-green)" : todayScore >= 70 ? "url(#gradient-yellow)" : "url(#gradient-orange)"}
@@ -183,7 +183,7 @@ export default function Dashboard() {
                       <span className={`text-4xl font-bold ${getScoreColor(todayScore)}`}>
                         {todayScore}%
                       </span>
-                      <span className="text-sm text-gray-500">{getScoreLabel(todayScore)}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{getScoreLabel(todayScore)}</span>
                     </div>
                   </div>
 
@@ -193,19 +193,19 @@ export default function Dashboard() {
                         {scoreDiff > 0 ? (
                           <>
                             <TrendingUp className="w-4 h-4 text-green-500" />
-                            <span className="text-sm text-green-600">
+                            <span className="text-sm text-green-600 dark:text-green-500">
                               {scoreDiff}% better than yesterday
                             </span>
                           </>
                         ) : (
-                          <span className="text-sm text-gray-600">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
                             {Math.abs(scoreDiff)}% lower than yesterday
                           </span>
                         )}
                       </div>
                     )}
                     {dashboardData && (
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {dashboardData.weeklyGoalProgress}% toward your {user.weeklyGoalScore}% weekly goal
                       </div>
                     )}
@@ -239,10 +239,10 @@ export default function Dashboard() {
                 size="lg"
                 onClick={() => router.push('/breaks')}
               >
-                <Coffee className="w-5 h-5 mr-3 text-orange-600" />
+                <Coffee className="w-5 h-5 mr-3 text-orange-600 dark:text-orange-500" />
                 <div className="text-left">
                   <div className="font-semibold">Take a Break</div>
-                  <div className="text-xs text-gray-500">Guided stretches & exercises</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Guided stretches & exercises</div>
                 </div>
               </Button>
 
@@ -252,10 +252,10 @@ export default function Dashboard() {
                 size="lg"
                 onClick={() => router.push('/exercises')}
               >
-                <Dumbbell className="w-5 h-5 mr-3 text-purple-600" />
+                <Dumbbell className="w-5 h-5 mr-3 text-purple-600 dark:text-purple-500" />
                 <div className="text-left">
                   <div className="font-semibold">Browse Exercises</div>
-                  <div className="text-xs text-gray-500">23 exercises available</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">23 exercises available</div>
                 </div>
               </Button>
 
@@ -265,23 +265,23 @@ export default function Dashboard() {
                 size="lg"
                 onClick={() => router.push('/calibration')}
               >
-                <Target className="w-5 h-5 mr-3 text-blue-600" />
+                <Target className="w-5 h-5 mr-3 text-blue-600 dark:text-blue-500" />
                 <div className="text-left">
                   <div className="font-semibold">Calibrate Workstation</div>
-                  <div className="text-xs text-gray-500">Set your ideal posture</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Set your ideal posture</div>
                 </div>
               </Button>
 
               <Button
                 variant="outline"
-                className="w-full justify-start border-indigo-200 hover:bg-indigo-50"
+                className="w-full justify-start border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950"
                 size="lg"
                 onClick={() => setShowPairingDialog(true)}
               >
-                <Smartphone className="w-5 h-5 mr-3 text-indigo-600" />
+                <Smartphone className="w-5 h-5 mr-3 text-indigo-600 dark:text-indigo-500" />
                 <div className="text-left">
                   <div className="font-semibold">Connect Mobile App</div>
-                  <div className="text-xs text-gray-500">Sync with your phone</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Sync with your phone</div>
                 </div>
               </Button>
             </CardContent>
@@ -300,45 +300,45 @@ export default function Dashboard() {
 
       {/* SECTION 2: TODAY'S STATS */}
       <section className="mb-8">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Today's Activity</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Today's Activity</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardContent className="p-4 text-center">
-              <Clock className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-              <div className="text-2xl font-bold text-gray-900">
+              <Clock className="w-8 h-8 mx-auto mb-2 text-blue-600 dark:text-blue-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {loading ? '--' : `${dashboardData?.sessionTime || 0}m`}
               </div>
-              <div className="text-sm text-gray-600">Session Time</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Session Time</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-4 text-center">
-              <Activity className="w-8 h-8 mx-auto mb-2 text-green-600" />
-              <div className="text-2xl font-bold text-gray-900">
+              <Activity className="w-8 h-8 mx-auto mb-2 text-green-600 dark:text-green-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {loading ? '--' : dashboardData?.sessionCount || 0}
               </div>
-              <div className="text-sm text-gray-600">Sessions</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Sessions</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-4 text-center">
-              <Coffee className="w-8 h-8 mx-auto mb-2 text-orange-600" />
-              <div className="text-2xl font-bold text-gray-900">
+              <Coffee className="w-8 h-8 mx-auto mb-2 text-orange-600 dark:text-orange-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {loading ? '--' : `${dashboardData?.breakCount || 0}`}
               </div>
-              <div className="text-sm text-gray-600">Breaks Taken</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Breaks Taken</div>
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="p-4 text-center">
-              <Zap className="w-8 h-8 mx-auto mb-2 text-yellow-600" />
-              <div className="text-2xl font-bold text-gray-900">
+              <Zap className="w-8 h-8 mx-auto mb-2 text-yellow-600 dark:text-yellow-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 {loading ? '--' : dashboardData?.pointsToday || 0}
               </div>
-              <div className="text-sm text-gray-600">Points Earned</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Points Earned</div>
             </CardContent>
           </Card>
         </div>
@@ -346,7 +346,7 @@ export default function Dashboard() {
 
       {/* SECTION 3: STREAKS & ACHIEVEMENTS */}
       <section className="mb-8">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Streaks & Progress</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Streaks & Progress</h3>
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -357,16 +357,16 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-center mb-4">
-                <div className="text-5xl font-bold text-orange-600 mb-2">
+                <div className="text-5xl font-bold text-orange-600 dark:text-orange-500 mb-2">
                   {loading ? '--' : dashboardData?.currentStreak || 0}
                 </div>
-                <div className="text-gray-600">
+                <div className="text-gray-600 dark:text-gray-400">
                   days in a row
                 </div>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Longest streak:</span>
-                <span className="font-semibold">
+                <span className="text-gray-600 dark:text-gray-400">Longest streak:</span>
+                <span className="font-semibold dark:text-gray-200">
                   {loading ? '--' : dashboardData?.longestStreak || 0} days
                 </span>
               </div>
@@ -380,22 +380,22 @@ export default function Dashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-600" />
+                <Trophy className="w-5 h-5 text-yellow-600 dark:text-yellow-500" />
                 Total Points
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-center mb-4">
-                <div className="text-5xl font-bold text-indigo-600 mb-2">
+                <div className="text-5xl font-bold text-indigo-600 dark:text-indigo-500 mb-2">
                   {loading ? '--' : user.totalPoints || 0}
                 </div>
-                <div className="text-gray-600">
+                <div className="text-gray-600 dark:text-gray-400">
                   lifetime points
                 </div>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Today:</span>
-                <span className="font-semibold text-green-600">
+                <span className="text-gray-600 dark:text-gray-400">Today:</span>
+                <span className="font-semibold text-green-600 dark:text-green-500">
                   +{loading ? '--' : dashboardData?.pointsToday || 0}
                 </span>
               </div>
@@ -407,31 +407,31 @@ export default function Dashboard() {
       {/* SECTION 4: INSIGHTS & ALERTS */}
       {!loading && dashboardData && (dashboardData.insights.length > 0 || dashboardData.problemAlerts.length > 0) && (
         <section className="mb-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Insights & Alerts</h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Insights & Alerts</h3>
           <div className="grid md:grid-cols-2 gap-4">
             {dashboardData.insights.map((insight, index) => (
               <Card key={index}>
                 <CardContent className="p-4 flex items-start gap-3">
-                  <Star className="w-5 h-5 text-blue-500 mt-0.5" />
+                  <Star className="w-5 h-5 text-blue-500 dark:text-blue-400 mt-0.5" />
                   <div>
-                    <p className="text-sm text-gray-900">{insight}</p>
+                    <p className="text-sm text-gray-900 dark:text-gray-100">{insight}</p>
                   </div>
                 </CardContent>
               </Card>
             ))}
 
             {dashboardData.problemAlerts.map((alert, index) => (
-              <Card key={index} className="border-orange-200 bg-orange-50">
+              <Card key={index} className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30">
                 <CardContent className="p-4 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-500 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-orange-900">{alert.title}</p>
-                    <p className="text-xs text-orange-700 mt-1">{alert.description}</p>
+                    <p className="text-sm font-medium text-orange-900 dark:text-orange-300">{alert.title}</p>
+                    <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">{alert.description}</p>
                     {alert.exerciseLink && (
                       <Button
                         variant="link"
                         size="sm"
-                        className="h-auto p-0 mt-2 text-orange-700"
+                        className="h-auto p-0 mt-2 text-orange-700 dark:text-orange-400"
                         onClick={() => router.push(`/exercises?area=${alert.area}`)}
                       >
                         View exercises <ArrowRight className="w-3 h-3 ml-1" />
@@ -449,29 +449,29 @@ export default function Dashboard() {
       {!loading && dashboardData && dashboardData.recentSessions.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-900">Recent Sessions</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Recent Sessions</h3>
             <Button variant="link" onClick={() => router.push('/insights')}>
               View all <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
           <Card>
             <CardContent className="p-0">
-              <div className="divide-y">
+              <div className="divide-y dark:divide-gray-700">
                 {dashboardData.recentSessions.map((session: any, index: number) => (
-                  <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div key={index} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                          session.overallScore >= 80 ? 'bg-green-100' :
-                          session.overallScore >= 70 ? 'bg-yellow-100' :
-                          'bg-orange-100'
+                          session.overallScore >= 80 ? 'bg-green-100 dark:bg-green-950/50' :
+                          session.overallScore >= 70 ? 'bg-yellow-100 dark:bg-yellow-950/50' :
+                          'bg-orange-100 dark:bg-orange-950/50'
                         }`}>
                           <span className={`text-lg font-bold ${getScoreColor(session.overallScore)}`}>
                             {session.overallScore}
                           </span>
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
                             {new Date(session.startTime).toLocaleDateString('en-US', {
                               month: 'short',
                               day: 'numeric',
@@ -479,7 +479,7 @@ export default function Dashboard() {
                               minute: '2-digit'
                             })}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
                             {session.duration} minutes • {session.pointsEarned} points
                           </div>
                         </div>
