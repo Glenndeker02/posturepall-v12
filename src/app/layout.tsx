@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Navigation } from "@/components/navigation";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 // const geistSans = Geist({
 //   variable: "--font-geist-sans",
@@ -43,9 +44,11 @@ export default function RootLayout({
       <body
         className="antialiased bg-background text-foreground font-sans"
       >
-        <Navigation />
-        {children}
-        <Toaster />
+        <AuthProvider>
+          <Navigation />
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );
