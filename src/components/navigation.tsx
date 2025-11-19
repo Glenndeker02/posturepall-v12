@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/logo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/theme-toggle'
 import {
   Home,
   TrendingUp,
@@ -37,7 +36,8 @@ const navigation = [
 
 export function Navigation() {
   const pathname = usePathname()
-  const [isPaired] = useState(true) // This would come from auth context
+  const { data: session, status } = useSession()
+  const isAuthenticated = status === 'authenticated'
 
   return (
     <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50 backdrop-blur-sm bg-white/95 dark:bg-gray-950/95">
@@ -75,14 +75,13 @@ export function Navigation() {
           </div>
 
           {/* Right side items */}
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            {isPaired ? (
+          <div className="flex items-center">
+            {isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="flex items-center space-x-2">
                     <User className="w-4 h-4" />
-                    <span className="hidden sm:inline">Profile</span>
+                    <span className="hidden sm:inline">{session?.user?.name || 'Profile'}</span>
                     <ChevronDown className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -92,34 +91,42 @@ export function Navigation() {
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span>Connected</span>
                     </div>
+                    {session?.user?.email && (
+                      <div className="text-xs text-gray-500 mt-1">{session.user.email}</div>
+                    )}
                   </div>
-                  
+
                   <DropdownMenuItem>
                     <Bell className="w-4 h-4 mr-2" />
                     <span>Notifications</span>
                     <Badge variant="secondary" className="ml-auto">3</Badge>
                   </DropdownMenuItem>
-                  
+
                   <DropdownMenuItem>
                     <User className="w-4 h-4 mr-2" />
                     <span>My Profile</span>
                   </DropdownMenuItem>
-                  
+
                   <DropdownMenuItem>
                     <Crown className="w-4 h-4 mr-2" />
                     <span>Upgrade to Premium</span>
                   </DropdownMenuItem>
-                  
+
                   <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem>
-                    <Settings className="w-4 h-4 mr-2" />
-                    <span>Settings</span>
+
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                      <Settings className="w-4 h-4 mr-2" />
+                      <span>Settings</span>
+                    </Link>
                   </DropdownMenuItem>
-                  
+
                   <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem className="text-red-600">
+
+                  <DropdownMenuItem
+                    className="text-red-600 cursor-pointer"
+                    onClick={() => signOut({ callbackUrl: '/auth' })}
+                  >
                     <LogOut className="w-4 h-4 mr-2" />
                     <span>Sign Out</span>
                   </DropdownMenuItem>

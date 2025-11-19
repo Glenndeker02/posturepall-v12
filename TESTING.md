@@ -1,786 +1,635 @@
-# PosturePal Testing Guide
+# SpineMate Testing Guide
 
-This document provides comprehensive testing procedures for all PosturePal features.
+This document provides comprehensive testing instructions for the SpineMate application, including API endpoints, mobile app screens, backend services, and end-to-end integration.
 
 ## Table of Contents
-1. [Authentication Flow](#authentication-flow)
-2. [Stripe Integration](#stripe-integration)
-3. [AI Posture Detection](#ai-posture-detection)
-4. [Achievement System](#achievement-system)
-5. [Goals System](#goals-system)
-6. [Settings Management](#settings-management)
+
+1. [Setup & Prerequisites](#setup--prerequisites)
+2. [Backend API Testing](#backend-api-testing)
+3. [Mobile App Testing](#mobile-app-testing)
+4. [Database Testing](#database-testing)
+5. [WebSocket Testing](#websocket-testing)
+6. [Integration Testing](#integration-testing)
+7. [Performance Testing](#performance-testing)
 
 ---
 
-## Authentication Flow
+## Setup & Prerequisites
 
-### Test Environment Setup
+### Install Dependencies
+
+**Backend:**
 ```bash
-# Start development server
+npm install
+```
+
+**Mobile:**
+```bash
+cd mobile
+npm install
+```
+
+### Environment Setup
+
+Create `.env` file in root directory:
+```env
+DATABASE_URL="file:./prisma/dev.db"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-secret-key-here"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+APPLE_CLIENT_ID="your-apple-client-id"
+APPLE_CLIENT_SECRET="your-apple-client-secret"
+```
+
+### Database Setup
+
+```bash
+# Generate Prisma client
+npm run db:generate
+
+# Push schema to database
+npm run db:push
+
+# (Optional) Seed database with test data
+npm run db:seed
+```
+
+---
+
+## Backend API Testing
+
+### Manual API Testing
+
+#### 1. Start Development Server
+
+```bash
+npm run dev
+```
+
+Server runs on `http://localhost:3000`
+
+#### 2. Test API Endpoints
+
+**Pairing API:**
+```bash
+# Generate QR code
+curl http://localhost:3000/api/pair
+
+# Pair device
+curl -X POST http://localhost:3000/api/pair \
+  -H "Content-Type: application/json" \
+  -d '{"qrCode":"ABC12345","deviceId":"test-device-1"}'
+```
+
+**User API:**
+```bash
+# Get user
+curl "http://localhost:3000/api/user?userId=USER_ID"
+
+# Create user
+curl -X POST http://localhost:3000/api/user \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","name":"Test User"}'
+
+# Update user
+curl -X PUT http://localhost:3000/api/user \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"USER_ID","name":"Updated Name"}'
+```
+
+**Sessions API:**
+```bash
+# Get sessions
+curl "http://localhost:3000/api/sessions?userId=USER_ID"
+
+# Create session
+curl -X POST http://localhost:3000/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"USER_ID",
+    "startTime":"2025-01-01T10:00:00Z",
+    "averageScore":85
+  }'
+```
+
+**Analytics API:**
+```bash
+# Get weekly analytics
+curl "http://localhost:3000/api/analytics?userId=USER_ID&timeRange=week"
+
+# Get monthly analytics
+curl "http://localhost:3000/api/analytics?userId=USER_ID&timeRange=month"
+```
+
+### Automated API Testing
+
+```bash
+# Run Jest tests
+npm test
+
+# Run API integration tests
+npm test __tests__/api/endpoints.test.ts
+
+# Run with coverage
+npm test -- --coverage
+```
+
+---
+
+## Mobile App Testing
+
+### Start Mobile App
+
+```bash
+cd mobile
+
+# Start Expo development server
+npm start
+
+# Run on iOS simulator
+npm run ios
+
+# Run on Android emulator
+npm run android
+
+# Run on physical device (scan QR code)
+```
+
+### Screen-by-Screen Testing
+
+#### 1. Home Screen (`app/index.tsx`)
+
+**Unauthenticated State:**
+- ✅ Shows welcome message
+- ✅ "Scan QR to Connect" button visible
+- ✅ SpineMate logo displays correctly
+
+**Authenticated State:**
+- ✅ Posture score ring animates correctly
+- ✅ Stats grid shows: Streak, Sessions, Breaks, Active Time
+- ✅ Quick actions navigate to correct screens
+- ✅ Connection status shows "Connected"
+- ✅ Real-time posture updates via WebSocket
+
+**Navigation:**
+```javascript
+// Test navigation
+router.push('/analytics')
+router.push('/exercises')
+router.push('/settings')
+router.push('/pairing')
+```
+
+#### 2. Pairing Screen (`app/pairing.tsx`)
+
+- ✅ Camera permission requested
+- ✅ QR scanner UI displays
+- ✅ Scan area with corner markers visible
+- ✅ Successfully scans QR code
+- ✅ Pairs device with backend
+- ✅ Navigates to home after pairing
+- ✅ WebSocket connection established
+
+#### 3. Analytics Screen (`app/analytics.tsx`)
+
+- ✅ Time range selector works (Week/Month/Quarter/Year)
+- ✅ Summary cards display correct metrics
+- ✅ Posture score trend chart renders
+- ✅ Problem areas bars show correct percentages
+- ✅ Recent sessions list populated
+- ✅ Pull-to-refresh functionality works
+- ✅ Export button shares analytics
+
+#### 4. Exercises Screen (`app/exercises.tsx`)
+
+- ✅ Category tabs filter exercises correctly
+- ✅ Search bar filters in real-time
+- ✅ Exercise cards display with thumbnails
+- ✅ Favorite toggle works
+- ✅ Filter modal opens and applies filters
+- ✅ Sort options change order (Popular/Duration/Recent)
+- ✅ Tapping exercise navigates to detail
+
+#### 5. Exercise Detail Screen (`app/exercises/[id].tsx`)
+
+- ✅ Exercise name and metadata display
+- ✅ Video placeholder or thumbnail shows
+- ✅ Step-by-step instructions listed
+- ✅ Benefits list with checkmarks
+- ✅ Related exercises carousel scrollable
+- ✅ Favorite button toggles
+- ✅ Share button works
+- ✅ "Start Exercise" navigates to workout
+
+#### 6. Workout Screen (`app/workout.tsx`)
+
+- ✅ Timer counts down correctly
+- ✅ Progress bar updates
+- ✅ Exercise queue shows coming up exercises
+- ✅ Pause/Resume buttons work
+- ✅ Skip button advances to next exercise
+- ✅ Points counter increments
+- ✅ Workout completion screen shows
+- ✅ Share results button works
+
+#### 7. Settings Screen (`app/settings.tsx`)
+
+- ✅ User profile displays correctly
+- ✅ Notification toggles save state
+- ✅ Sync functionality works
+- ✅ Subscription tier shows correctly
+- ✅ About links open correctly
+- ✅ Logout confirmation modal
+- ✅ Delete account modal works
+
+### Component Testing
+
+Test each reusable component:
+
+```bash
+# Run mobile app tests
+cd mobile
+npm test
+
+# Run integration tests
+npm test __tests__/integration.test.tsx
+```
+
+**Components to Test:**
+- Button (all variants)
+- Card
+- Badge (all variants)
+- ScoreRing (animation)
+- StatCard
+- ExerciseCard
+- ChartComponent
+- LoadingSpinner
+- EmptyState
+- Modal
+- ErrorBoundary
+
+---
+
+## Database Testing
+
+### SQLite Database (Mobile)
+
+```javascript
+import { databaseService } from './services/database'
+
+// Initialize
+await databaseService.initialize()
+
+// Test user operations
+await databaseService.saveUser(testUser)
+const user = await databaseService.getUser(userId)
+
+// Test session operations
+await databaseService.savePostureSession(session)
+const sessions = await databaseService.getPostureSessions(userId)
+
+// Test caching
+await databaseService.cacheAnalytics(userId, 'week', analytics)
+const cached = await databaseService.getCachedAnalytics(userId, 'week')
+
+// Test sync queue
+const queue = await databaseService.getSyncQueue()
+
+// Get stats
+const stats = await databaseService.getDatabaseStats()
+console.log(stats) // { users: 1, sessions: 10, breaks: 5, queueSize: 3 }
+```
+
+### Prisma Database (Backend)
+
+```bash
+# View database in Prisma Studio
+npx prisma studio
+
+# Reset database
+npx prisma db push --force-reset
+
+# Generate SQL migration
+npx prisma migrate dev --name test_migration
+```
+
+---
+
+## WebSocket Testing
+
+### Manual WebSocket Testing
+
+Use a WebSocket client (like `wscat` or browser console):
+
+```javascript
+// Connect to WebSocket
+const socket = io('http://localhost:3000', {
+  auth: {
+    userId: 'test-user-id',
+    deviceId: 'test-device-123',
+    type: 'mobile'
+  }
+})
+
+// Listen for events
+socket.on('posture-data', (data) => {
+  console.log('Received posture data:', data)
+})
+
+socket.on('new-achievement', (data) => {
+  console.log('Achievement unlocked:', data)
+})
+
+socket.on('break-reminder', (data) => {
+  console.log('Break reminder:', data)
+})
+
+// Emit events
+socket.emit('mobile-connected', {
+  userId: 'test-user-id',
+  deviceId: 'test-device-123'
+})
+
+socket.emit('check-achievements', {
+  userId: 'test-user-id'
+})
+```
+
+### Test All WebSocket Events
+
+**Authentication & Pairing:**
+- `mobile-connected` → `device-paired`
+- `generate-qr` → `qr-generated`
+- `pairing-success`
+
+**Posture Data:**
+- `posture-data` (web to mobile)
+- `acknowledge-posture`
+
+**Analytics:**
+- `analytics-update`
+- `goal-progress`
+
+**Achievements:**
+- `achievement-unlocked` → `new-achievement`
+- `check-achievements`
+
+**Breaks:**
+- `break-reminder`
+- `break-started`
+- `break-completed`
+
+**Sync:**
+- `sync-request` → `sync-start` → `sync-complete`
+
+---
+
+## Integration Testing
+
+### End-to-End User Flow
+
+**Test Scenario 1: New User Onboarding**
+
+1. Open mobile app (unauthenticated)
+2. Tap "Scan QR to Connect"
+3. Open webapp, generate QR code
+4. Scan QR code with mobile
+5. Verify pairing success
+6. Check WebSocket connection established
+7. Verify user data synced to mobile
+
+**Test Scenario 2: Posture Tracking**
+
+1. Start posture tracking on webapp
+2. Verify real-time data streams to mobile
+3. Check posture score updates on mobile
+4. Verify session saved to database
+5. Check sync queue has pending items
+6. Trigger sync
+7. Verify session appears in webapp analytics
+
+**Test Scenario 3: Break Exercise**
+
+1. Navigate to Exercises screen
+2. Select an exercise
+3. Start exercise
+4. Complete workout
+5. Verify points awarded
+6. Check achievement unlocked
+7. Verify notification sent
+8. Check data synced to backend
+
+**Test Scenario 4: Offline Mode**
+
+1. Disconnect from internet
+2. Create posture session
+3. Create break session
+4. Check data saved to SQLite
+5. Verify sync queue populated
+6. Reconnect to internet
+7. Check auto-sync triggered
+8. Verify all data synced to server
+
+### Backend-Frontend Synchronization
+
+**Test Data Flow:**
+
+```
+Mobile → API → Database → API → Mobile
+  ↓                           ↓
+SQLite                    Analytics
+  ↓                           ↓
+Sync Queue → Sync API → Prisma DB
+```
+
+**Verification Steps:**
+
+1. Create data on mobile (offline)
+2. Check SQLite has data
+3. Check sync queue populated
+4. Trigger sync
+5. Verify API receives data
+6. Check Prisma database updated
+7. Fetch analytics from API
+8. Verify mobile receives updated analytics
+9. Check cache updated
+
+---
+
+## Performance Testing
+
+### Mobile App Performance
+
+```javascript
+import { estimateObjectSize, formatNumber } from './utils/performance'
+
+// Test memory usage
+const user = await databaseService.getUser(userId)
+const size = estimateObjectSize(user)
+console.log('User object size:', formatNumber(size), 'bytes')
+
+// Test database query speed
+console.time('getSessions')
+const sessions = await databaseService.getPostureSessions(userId, 100)
+console.timeEnd('getSessions')
+
+// Test component render time
+console.time('renderAnalytics')
+// Render analytics screen
+console.timeEnd('renderAnalytics')
+```
+
+### API Performance
+
+```bash
+# Use Apache Bench for load testing
+ab -n 1000 -c 10 http://localhost:3000/api/analytics?userId=test-user-id
+
+# Results should show:
+# - Requests per second > 100
+# - Mean response time < 100ms
+# - No failed requests
+```
+
+### Database Performance
+
+```sql
+-- Check query performance
+EXPLAIN QUERY PLAN SELECT * FROM posture_sessions WHERE userId = 'test-user-id';
+
+-- Should use index: idx_posture_sessions_user
+```
+
+---
+
+## Test Checklist
+
+### Backend ✅
+
+- [ ] All API endpoints return correct responses
+- [ ] Error handling works for invalid requests
+- [ ] Database operations complete successfully
+- [ ] WebSocket events emit and receive correctly
+- [ ] Authentication system works
+- [ ] Recommendation engine returns personalized results
+- [ ] Streak calculator computes correctly
+- [ ] Achievement system triggers appropriately
+
+### Mobile ✅
+
+- [ ] App initializes without errors
+- [ ] All screens navigate correctly
+- [ ] Components render properly
+- [ ] Forms validate input
+- [ ] Images load correctly
+- [ ] Animations are smooth
+- [ ] Offline mode works
+- [ ] Notifications display
+- [ ] Camera permissions handled
+
+### Integration ✅
+
+- [ ] QR pairing flow works end-to-end
+- [ ] Real-time data syncs webapp ↔ mobile
+- [ ] Offline data syncs when reconnected
+- [ ] Analytics updates reflect new data
+- [ ] Achievements unlock correctly
+- [ ] Break reminders trigger
+- [ ] Multi-device support works
+
+### Performance ✅
+
+- [ ] API response times < 200ms
+- [ ] Mobile app launches < 3s
+- [ ] Screen transitions < 100ms
+- [ ] Database queries optimized
+- [ ] Memory usage reasonable
+- [ ] No memory leaks
+- [ ] Smooth 60fps animations
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Database Connection Error**
+```bash
+# Solution: Reset database
+npm run db:push
+```
+
+**2. WebSocket Not Connecting**
+```bash
+# Solution: Check server is running
 npm run dev
 
-# Verify database is accessible
-npx prisma studio
+# Verify WebSocket endpoint
+curl http://localhost:3000/socket.io/
 ```
 
-### 1. User Registration (Signup)
-
-**Endpoint:** `POST /api/auth/signup`
-
-**Test Case 1: Successful Registration**
+**3. Mobile App Won't Start**
 ```bash
-curl -X POST http://localhost:3000/api/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Test123!@#",
-    "name": "Test User"
-  }'
+# Solution: Clear cache and reinstall
+cd mobile
+rm -rf node_modules
+npm install
+npm start -- --clear
 ```
 
-**Expected Response:**
-```json
-{
-  "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "...",
-    "email": "test@example.com",
-    "name": "Test User"
-  }
-}
+**4. Notifications Not Working**
+```javascript
+// Solution: Check permissions
+const { status } = await Notifications.getPermissionsAsync()
+console.log('Notification permission:', status)
 ```
 
-**Verification:**
-- ✅ User created in database
-- ✅ Password is hashed (bcrypt)
-- ✅ JWT token returned
-- ✅ Default values set (subscriptionTier: "free", totalPoints: 0, etc.)
-
-**Test Case 2: Duplicate Email**
-```bash
-# Register same email again
-curl -X POST http://localhost:3000/api/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Another123!@#"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "error": "User already exists with this email"
-}
-```
-**Status Code:** 400
-
----
-
-### 2. User Login
-
-**Endpoint:** `POST /api/auth/login`
-
-**Test Case 1: Successful Login**
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "Test123!@#"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "...",
-    "email": "test@example.com",
-    "name": "Test User",
-    "avatar": null,
-    "subscriptionTier": "free"
-  }
-}
-```
-
-**Test Case 2: Invalid Credentials**
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "WrongPassword123"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "error": "Invalid credentials"
-}
-```
-**Status Code:** 401
-
----
-
-### 3. Get Current User
-
-**Endpoint:** `GET /api/auth/me`
-
-**Test Case: Get Authenticated User**
-```bash
-# Replace TOKEN with actual JWT from login/signup
-curl -X GET http://localhost:3000/api/auth/me \
-  -H "Authorization: Bearer TOKEN"
-```
-
-**Expected Response:**
-```json
-{
-  "user": {
-    "id": "...",
-    "email": "test@example.com",
-    "name": "Test User",
-    "avatar": null,
-    "subscriptionTier": "free"
-  }
-}
+**5. Offline Sync Failing**
+```javascript
+// Solution: Check sync queue
+const queue = await databaseService.getSyncQueue()
+console.log('Pending sync items:', queue.length)
 ```
 
 ---
 
-### 4. Token Refresh
-
-**Endpoint:** `POST /api/auth/refresh`
-
-**Test Case: Refresh Valid Token**
-```bash
-curl -X POST http://localhost:3000/api/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{
-    "token": "OLD_TOKEN"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "token": "NEW_TOKEN",
-  "user": {
-    "id": "...",
-    "email": "test@example.com",
-    "name": "Test User"
-  }
-}
-```
-
----
-
-### 5. Logout
-
-**Endpoint:** `POST /api/auth/logout`
-
-**Test Case: Successful Logout**
-```bash
-curl -X POST http://localhost:3000/api/auth/logout \
-  -H "Authorization: Bearer TOKEN"
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "message": "Logged out successfully"
-}
-```
-
-**Verification:**
-- ✅ User's lastActivityDate updated in database
-
----
-
-## Stripe Integration
-
-### Prerequisites
-```bash
-# Set environment variables in .env
-STRIPE_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_STRIPE_PREMIUM_PRICE_ID=price_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-```
-
-### 1. Create Checkout Session
-
-**Endpoint:** `POST /api/stripe/create-checkout-session`
-
-**Test Case: Create Premium Checkout**
-```bash
-curl -X POST http://localhost:3000/api/stripe/create-checkout-session \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "priceId": "price_premium_monthly",
-    "successUrl": "http://localhost:3000/dashboard",
-    "cancelUrl": "http://localhost:3000/pricing"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "sessionId": "cs_test_...",
-  "url": "https://checkout.stripe.com/c/pay/cs_test_..."
-}
-```
-
-**Verification:**
-- ✅ Stripe customer created (if new)
-- ✅ Customer ID saved to user.stripeCustomerId
-- ✅ Checkout session created with 14-day trial
-- ✅ Redirect URL is valid Stripe checkout page
-
-**Manual Test:**
-1. Visit the returned `url` in browser
-2. Complete test payment using card: `4242 4242 4242 4242`
-3. Verify redirect to success URL
-4. Check webhook received `checkout.session.completed`
-
----
-
-### 2. Customer Portal
-
-**Endpoint:** `POST /api/stripe/create-portal-session`
-
-**Test Case: Access Billing Portal**
-```bash
-curl -X POST http://localhost:3000/api/stripe/create-portal-session \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "returnUrl": "http://localhost:3000/settings"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "url": "https://billing.stripe.com/p/session/..."
-}
-```
-
-**Manual Test:**
-1. Visit the returned `url`
-2. Verify can view subscription details
-3. Verify can cancel subscription
-4. Verify can update payment method
-
----
-
-### 3. Webhook Handler
-
-**Endpoint:** `POST /api/stripe/webhook`
-
-**Test Case: Simulate Subscription Created**
-```bash
-# Use Stripe CLI to forward webhooks
-stripe listen --forward-to localhost:3000/api/stripe/webhook
-
-# In another terminal, trigger test event
-stripe trigger customer.subscription.created
-```
-
-**Expected Actions:**
-- ✅ Subscription record created in database
-- ✅ User's subscriptionTier updated to "premium"
-- ✅ User's stripeSubscriptionId saved
-- ✅ User's stripeCurrentPeriodEnd saved
-
-**Test Events to Verify:**
-- `checkout.session.completed` - Initial subscription
-- `customer.subscription.updated` - Plan changes
-- `customer.subscription.deleted` - Cancellation
-- `invoice.payment_succeeded` - Successful payment
-- `invoice.payment_failed` - Failed payment
-
----
-
-## AI Posture Detection
-
-### 1. Web Worker Initialization
-
-**Test Case: Initialize Pose Worker**
-```typescript
-import { PoseWorkerManager } from '@/lib/ai/pose-worker-manager';
-
-const manager = new PoseWorkerManager();
-
-// Test initialization
-await manager.initialize('thunder'); // or 'lightning'
-
-// Verify
-console.log('Worker ready:', manager.isReady()); // Should be true
-```
-
-**Expected:**
-- ✅ Worker created successfully
-- ✅ TensorFlow.js loaded in worker
-- ✅ MoveNet model loaded
-- ✅ WebGL backend initialized
-- ✅ `isReady()` returns true
-
----
-
-### 2. Pose Detection from Video
-
-**Test Case: Detect Pose from Webcam**
-```typescript
-// Get video element
-const video = document.querySelector('video') as HTMLVideoElement;
-
-// Set up pose callback
-manager.onPose((pose) => {
-  if (pose) {
-    console.log('Detected keypoints:', pose.keypoints.length);
-    console.log('Confidence score:', pose.score);
-    console.log('Timestamp:', pose.timestamp);
-  }
-});
-
-// Set up error callback
-manager.onError((error) => {
-  console.error('Detection error:', error);
-});
-
-// Process frame
-manager.processFrame(video);
-```
-
-**Expected:**
-- ✅ Pose detected with 13 keypoints
-- ✅ Each keypoint has: x, y, score, name
-- ✅ Confidence score between 0-1
-- ✅ Timestamp in milliseconds
-- ✅ Only keypoints with score >= 0.3 returned
-
-**Keypoint Names to Verify:**
-- nose, left_eye, right_eye
-- left_ear, right_ear
-- left_shoulder, right_shoulder
-- left_elbow, right_elbow
-- left_wrist, right_wrist
-- left_hip, right_hip
-
----
-
-### 3. Posture Metrics Calculation
-
-**Test Case: Calculate Posture Quality**
-```typescript
-import { calculatePostureMetrics } from '@/lib/ai/posture-metrics';
-
-const pose = /* detected pose from above */;
-const calibration = /* user's calibration data */;
-
-const metrics = calculatePostureMetrics(pose, calibration);
-
-console.log('Head Forward Angle:', metrics.headForwardAngle);
-console.log('Shoulder Symmetry:', metrics.shoulderSymmetry);
-console.log('Composite Score:', metrics.compositeScore);
-console.log('Posture Quality:', metrics.quality);
-```
-
-**Expected Metrics:**
-- ✅ `headForwardAngle`: 0-90 degrees
-- ✅ `shoulderSymmetry`: 0-100%
-- ✅ `shoulderRoundedness`: 0-100%
-- ✅ `spineAlignment`: 0-100%
-- ✅ `screenDistance`: Relative distance
-- ✅ `compositeScore`: 0-100
-- ✅ `quality`: 'excellent' | 'good' | 'fair' | 'poor'
-
-**Quality Thresholds:**
-- Excellent: 90-100
-- Good: 70-89
-- Fair: 50-69
-- Poor: 0-49
-
----
-
-### 4. Performance Monitoring
-
-**Test Case: Track FPS and Processing Time**
-```typescript
-import { PerformanceMonitor } from '@/lib/ai/performance-monitor';
-
-const monitor = new PerformanceMonitor();
-
-// In your detection loop
-function detectLoop() {
-  monitor.recordFrame();
-
-  const startTime = performance.now();
-  manager.processFrame(video);
-  const endTime = performance.now();
-
-  monitor.recordProcessingTime(endTime - startTime);
-
-  // Check stats
-  const stats = monitor.getStats();
-  console.log('FPS:', stats.fps);
-  console.log('Avg Processing Time:', stats.avgProcessingTime);
-
-  // Get recommendations
-  const recommendations = monitor.getRecommendations();
-  console.log('Recommendations:', recommendations);
-
-  requestAnimationFrame(detectLoop);
-}
-```
-
-**Expected Performance:**
-- ✅ Thunder model: 5-15 FPS
-- ✅ Lightning model: 15-30 FPS
-- ✅ Processing time < 200ms per frame
-- ✅ Recommendations provided if performance issues
-
----
-
-## Achievement System
-
-### 1. Seed Achievements
-
-**Test Case: Run Seeding Script**
-```bash
-npm run seed:achievements
-```
-
-**Expected Output:**
-```
-🌱 Starting achievement seeding...
-🗑️  Cleared 0 existing achievements
-✅ Created: First Steps (common)
-✅ Created: Calibrated (common)
-...
-🎉 Seeding completed!
-✅ Successfully created: 27 achievements
-❌ Failed: 0 achievements
-
-📊 Achievement Breakdown:
-   Common: 9
-   Rare: 10
-   Legendary: 8
-   Total: 27
-```
-
-**Verification in Prisma Studio:**
-- ✅ 27 achievements in database
-- ✅ All have: name, description, icon, points, rarity, condition
-
----
-
-### 2. Get All Achievements
-
-**Test Case: Fetch Achievement List**
-```bash
-curl -X GET http://localhost:3000/api/achievements \
-  -H "Authorization: Bearer TOKEN"
-```
-
-**Expected Response:**
-```json
-{
-  "achievements": [
-    {
-      "id": "...",
-      "name": "First Steps",
-      "description": "Complete your first posture monitoring session",
-      "icon": "🎯",
-      "points": 10,
-      "rarity": "common",
-      "unlocked": false,
-      "earnedAt": null
-    },
-    ...
-  ],
-  "total": 27,
-  "unlocked": 0
-}
+## Continuous Integration
+
+### GitHub Actions (Recommended)
+
+Create `.github/workflows/test.yml`:
+
+```yaml
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - run: npm install
+      - run: npm run db:push
+      - run: npm test
+      - run: npm run build
 ```
 
 ---
 
-### 3. Check and Unlock Achievements
+## Summary
 
-**Test Case: Auto-Unlock Qualifying Achievements**
-```bash
-# First, complete some sessions to qualify
-# Then check achievements
-curl -X POST http://localhost:3000/api/achievements/check \
-  -H "Authorization: Bearer TOKEN"
-```
+This testing guide covers all aspects of the SpineMate application:
 
-**Expected Response:**
-```json
-{
-  "success": true,
-  "newlyUnlocked": [
-    {
-      "id": "...",
-      "name": "First Steps",
-      "description": "Complete your first posture monitoring session",
-      "points": 10,
-      "rarity": "common"
-    }
-  ],
-  "count": 1
-}
-```
+- **API Testing**: All 6 API endpoints with manual and automated tests
+- **Mobile Testing**: All 7 screens with component and integration tests
+- **Database Testing**: Both SQLite (mobile) and Prisma (backend)
+- **WebSocket Testing**: All 20+ real-time events
+- **Integration Testing**: Complete user flows and data synchronization
+- **Performance Testing**: Load testing, memory profiling, and optimization
 
-**Verification:**
-- ✅ UserAchievement record created
-- ✅ Points added to user.totalPoints
-- ✅ Achievement condition checked correctly
-
----
-
-## Goals System
-
-### 1. Create Goal
-
-**Test Case: Create New Goal**
-```bash
-curl -X POST http://localhost:3000/api/goals \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "title": "Complete 30 sessions this month",
-    "description": "Stay consistent with posture monitoring",
-    "targetValue": 30,
-    "unit": "sessions",
-    "deadline": "2025-12-31"
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "goal": {
-    "id": "...",
-    "title": "Complete 30 sessions this month",
-    "targetValue": 30,
-    "currentValue": 0,
-    "unit": "sessions",
-    "deadline": "2025-12-31T00:00:00.000Z",
-    "isCompleted": false
-  }
-}
-```
-
----
-
-### 2. Get User Goals
-
-**Test Case: Fetch Goals with Filter**
-```bash
-# Get all active goals
-curl -X GET "http://localhost:3000/api/goals?filter=active" \
-  -H "Authorization: Bearer TOKEN"
-```
-
-**Expected Response:**
-```json
-{
-  "goals": [
-    {
-      "id": "...",
-      "title": "Complete 30 sessions this month",
-      "currentValue": 5,
-      "targetValue": 30,
-      "isCompleted": false
-    }
-  ],
-  "stats": {
-    "total": 3,
-    "active": 2,
-    "completed": 1,
-    "completionRate": 33
-  }
-}
-```
-
----
-
-### 3. Update Goal Progress
-
-**Test Case: Update Goal**
-```bash
-curl -X PATCH http://localhost:3000/api/goals/GOAL_ID \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "currentValue": 15,
-    "isCompleted": false
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "goal": {
-    "id": "...",
-    "currentValue": 15,
-    "targetValue": 30
-  }
-}
-```
-
----
-
-## Settings Management
-
-### 1. Get User Settings
-
-**Test Case: Fetch Settings**
-```bash
-curl -X GET http://localhost:3000/api/user/settings \
-  -H "Authorization: Bearer TOKEN"
-```
-
-**Expected Response:**
-```json
-{
-  "id": "...",
-  "email": "test@example.com",
-  "name": "Test User",
-  "subscriptionTier": "free",
-  "workEnvironment": "home",
-  "dailySittingHours": 8,
-  "breakRemindersEnabled": true,
-  "streakRemindersEnabled": true,
-  "totalPoints": 150,
-  "totalSessions": 12,
-  "longestStreak": 5,
-  "totalBreaks": 8
-}
-```
-
----
-
-### 2. Update Settings
-
-**Test Case: Save Profile Changes**
-```bash
-curl -X PATCH http://localhost:3000/api/user/settings \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{
-    "name": "Updated Name",
-    "workEnvironment": "office",
-    "dailySittingHours": 10,
-    "breakRemindersEnabled": false
-  }'
-```
-
-**Expected Response:**
-```json
-{
-  "success": true,
-  "user": {
-    "id": "...",
-    "name": "Updated Name",
-    "workEnvironment": "office"
-  }
-}
-```
-
----
-
-## Test Results Summary
-
-### ✅ Authentication Flow
-- [x] User registration
-- [x] User login
-- [x] Token validation
-- [x] Token refresh
-- [x] User logout
-- [x] Password hashing (bcrypt)
-- [x] JWT token generation
-
-### ✅ Stripe Integration
-- [x] Checkout session creation
-- [x] Customer portal access
-- [x] Webhook handling
-- [x] Subscription management
-- [x] 14-day trial setup
-
-### ✅ AI Posture Detection
-- [x] Web Worker initialization
-- [x] TensorFlow.js model loading
-- [x] Real-time pose detection
-- [x] Posture metrics calculation
-- [x] Performance monitoring
-
-### ✅ Achievement System
-- [x] Achievement seeding (27 achievements)
-- [x] Achievement listing
-- [x] Auto-unlock logic
-- [x] Points awarding
-
-### ✅ Goals System
-- [x] Goal creation
-- [x] Goal listing with filters
-- [x] Progress tracking
-- [x] Goal completion
-
-### ✅ Settings Management
-- [x] Fetch user settings
-- [x] Update profile
-- [x] Subscription info display
-
----
-
-## Performance Benchmarks
-
-### Database Query Performance (with indexes)
-- User authentication: < 50ms
-- Dashboard data load: < 100ms
-- Session history query: < 150ms
-- Achievement check: < 75ms
-- Goal list fetch: < 50ms
-
-### AI Detection Performance
-- Thunder model: 100-200ms per frame (5-10 FPS)
-- Lightning model: 30-70ms per frame (15-30 FPS)
-- WebGL backend: 40% faster than CPU
-
-### API Response Times
-- Auth endpoints: 50-150ms
-- Settings fetch: 50-100ms
-- Goals CRUD: 30-80ms
-- Achievement check: 50-120ms
-
----
-
-## Known Issues & Limitations
-
-1. **Stripe Webhooks:** Requires ngrok or deployed environment for testing
-2. **AI Detection:** Requires good lighting and camera quality
-3. **Performance:** Heavy analytics queries may need further optimization
-4. **Mobile:** Web Worker may not work on all mobile browsers
-
----
-
-## Next Steps
-
-1. Add unit tests with Jest
-2. Add E2E tests with Playwright
-3. Set up CI/CD pipeline
-4. Add monitoring and error tracking
-5. Performance profiling and optimization
+Follow this guide to ensure the application is production-ready and all features work correctly across platforms.

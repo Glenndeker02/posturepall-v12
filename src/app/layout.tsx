@@ -3,8 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Navigation } from "@/components/navigation";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ThemeProvider } from "@/components/theme-provider";
+import SessionProvider from "@/components/providers/session-provider";
 
 // const geistSans = Geist({
 //   variable: "--font-geist-sans",
@@ -45,18 +44,11 @@ export default function RootLayout({
       <body
         className="antialiased bg-background text-foreground font-sans"
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            <Navigation />
-            {children}
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
+        <SessionProvider>
+          <Navigation />
+          {children}
+          <Toaster />
+        </SessionProvider>
       </body>
     </html>
   );

@@ -234,56 +234,47 @@ export default function Onboarding() {
 
   const handleComplete = async () => {
     try {
-      // If user account wasn't created yet (shouldn't happen), create it now
-      if (!userId) {
-        await createUserAccount()
-      }
-
-      if (!userId) {
-        alert('Failed to create account. Please try again.')
+      // Get user data from localStorage
+      const userStr = localStorage.getItem('user')
+      if (!userStr) {
+        alert('Please login first')
+        window.location.href = '/auth'
         return
       }
 
-      // Mark onboarding as completed
-      localStorage.setItem('onboardingCompleted', 'true')
+      const user = JSON.parse(userStr)
 
-      // Create default workstation with calibration
-      const workstationName = workEnvironments.find(e => e.id === onboardingData.workEnvironment)?.label || 'My Workstation'
-
-      await fetch('/api/workstations', {
+      // Save onboarding data to backend
+      const response = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: userId,
-          name: workstationName,
-          location: 'Primary setup',
-          calibrationData: calibrationData,
-          isDefault: true,
-        }),
+          email: user.email,
+          name: onboardingData.name || user.name,
+          workEnvironment: onboardingData.workEnvironment,
+          dailySittingHours: onboardingData.dailySittingHours,
+          painAreas: onboardingData.painAreas,
+          workSchedule: onboardingData.workSchedule,
+          userGoals: {
+            primaryGoal: onboardingData.primaryGoal,
+            commitmentLevel: onboardingData.commitmentLevel
+          }
+        })
       })
 
-      // Create initial goal if set
-      if (goalData) {
-        await fetch('/api/user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: userId,
-            goal: {
-              title: goalData.customGoal || goalData.template,
-              description: goalData.commitment,
-              targetValue: 100,
-              unit: 'percentage',
-            },
-          }),
-        })
-      }
+      const data = await response.json()
 
-      // Redirect to dashboard
-      window.location.href = '/dashboard'
+      if (data.success) {
+        // Update user in localStorage
+        localStorage.setItem('user', JSON.stringify(data.user))
+        // Redirect to calibration
+        window.location.href = '/calibration'
+      } else {
+        alert('Failed to save onboarding data')
+      }
     } catch (error) {
-      console.error('Error completing onboarding:', error)
-      alert('An error occurred. Please try again.')
+      console.error('Onboarding save error:', error)
+      alert('An error occurred while saving your data')
     }
   }
 
