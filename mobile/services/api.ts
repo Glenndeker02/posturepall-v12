@@ -14,7 +14,7 @@ import type {
 const API_URL = process.env.API_URL || 'http://localhost:3000'
 
 class ApiService {
-  private client: AxiosInstance
+  public client: AxiosInstance
 
   constructor() {
     this.client = axios.create({
@@ -119,10 +119,9 @@ class ApiService {
 
   // ==================== EXERCISES ====================
 
-  async getExercises(): Promise<Exercise[]> {
-    // For now, return mock data since we don't have an exercises API endpoint yet
-    // In production, this would fetch from /api/exercises
-    return []
+  async getExercises(): Promise<{ success: boolean; exercises: Exercise[] }> {
+    const { data } = await this.client.get('/exercises')
+    return data
   }
 
   // ==================== HEALTH CHECK ====================
