@@ -14,26 +14,65 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(cuid())
-  email             String   @unique
+  id                String    @id @default(cuid())
+  email             String?   @unique
+  emailVerified     DateTime?
   name              String?
+  image             String?
   avatar            String?
-  subscriptionTier  String   @default("free") // free, premium
-  workEnvironment   String?  // office, home, flexible, student, gaming, other
-  dailySittingHours Int?     // 2-14 hours
-  painAreas         String?  // JSON array of pain areas
-  workSchedule      String?  // JSON object with work hours and preferences
-  userGoals         String?  // JSON object with user goals
-  calibrationData   String?  // JSON object with posture baseline
-  qrPairingCode     String?  @unique
+  subscriptionTier  String    @default("free") // free, premium
+  workEnvironment   String?   // office, home, flexible, student, gaming, other
+  dailySittingHours Int?      // 2-14 hours
+  painAreas         String?   // JSON array of pain areas
+  workSchedule      String?   // JSON object with work hours and preferences
+  userGoals         String?   // JSON object with user goals
+  calibrationData   String?   // JSON object with posture baseline
+  qrPairingCode     String?   @unique
   mobileDeviceId    String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  accounts          Account[]
+  sessions          Session[]
   postureSessions   PostureSession[]
   breakSessions     BreakSession[]
   achievements      UserAchievement[]
   goals             Goal[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model PostureSession {
