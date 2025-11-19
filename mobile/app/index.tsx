@@ -5,6 +5,7 @@ import { useAppStore } from '../store'
 import { useEffect, useState } from 'react'
 import socketService from '../services/socket'
 import apiService from '../services/api'
+import { authService } from '../services/auth'
 
 const { width } = Dimensions.get('window')
 
@@ -12,6 +13,28 @@ export default function HomeScreen() {
   const router = useRouter()
   const { user, isAuthenticated, deviceId, currentPosture, analytics } = useAppStore()
   const [streak, setStreak] = useState(0)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+
+  useEffect(() => {
+    // Check authentication and onboarding status on mount
+    async function checkAuthStatus() {
+      const authenticated = await authService.isAuthenticated()
+      if (!authenticated) {
+        router.replace('/auth/welcome')
+        return
+      }
+
+      const onboardingComplete = await authService.isOnboardingComplete()
+      if (!onboardingComplete) {
+        router.replace('/onboarding/work-environment')
+        return
+      }
+
+      setIsCheckingAuth(false)
+    }
+
+    checkAuthStatus()
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated && user && deviceId) {

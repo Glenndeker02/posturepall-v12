@@ -77,6 +77,19 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: '#F9FAFB' },
           }}
         >
+          {/* Auth Screens */}
+          <Stack.Screen name="auth/welcome" />
+          <Stack.Screen name="auth/login" />
+          <Stack.Screen name="auth/signup" />
+
+          {/* Onboarding Screens */}
+          <Stack.Screen name="onboarding/work-environment" />
+          <Stack.Screen name="onboarding/sitting-hours" />
+          <Stack.Screen name="onboarding/pain-areas" />
+          <Stack.Screen name="onboarding/goals" />
+          <Stack.Screen name="onboarding/complete" />
+
+          {/* Main App Screens */}
           <Stack.Screen name="index" />
           <Stack.Screen name="pairing" />
           <Stack.Screen name="analytics" />

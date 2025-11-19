@@ -20,6 +20,7 @@ model User {
   name              String?
   image             String?
   avatar            String?
+  password          String?   // For email/password authentication (hashed)
   subscriptionTier  String    @default("free") // free, premium
   workEnvironment   String?   // office, home, flexible, student, gaming, other
   dailySittingHours Int?      // 2-14 hours
