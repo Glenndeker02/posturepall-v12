@@ -40,7 +40,7 @@ export function Navigation() {
   const isAuthenticated = status === 'authenticated'
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50 backdrop-blur-sm bg-white/95 dark:bg-gray-950/95">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
@@ -52,7 +52,7 @@ export function Navigation() {
 
           {/* Navigation Tabs */}
           <div className="hidden md:flex items-center justify-center">
-            <div className="inline-flex items-center p-1 bg-gray-100 rounded-lg">
+            <div className="inline-flex items-center p-1 bg-gray-100 dark:bg-gray-900 rounded-lg">
               {navigation.map((item) => {
                 const isActive = pathname === item.href
                 return (
@@ -62,8 +62,8 @@ export function Navigation() {
                     className={cn(
                       'inline-flex items-center justify-center px-6 py-3 text-sm font-medium rounded-md transition-all duration-200',
                       isActive
-                        ? 'bg-black text-white shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                        ? 'bg-black dark:bg-white text-white dark:text-black shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800'
                     )}
                   >
                     <item.icon className="w-4 h-4 mr-2" />
@@ -86,7 +86,7 @@ export function Navigation() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5 text-sm font-medium border-b">
+                  <div className="px-2 py-1.5 text-sm font-medium border-b dark:border-gray-700">
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span>Connected</span>
@@ -141,8 +141,8 @@ export function Navigation() {
         </div>
 
         {/* Mobile Navigation */}
-        <div className="md:hidden border-t border-gray-200">
-          <div className="flex p-1 bg-gray-100 m-2 rounded-lg">
+        <div className="md:hidden border-t border-gray-200 dark:border-gray-800">
+          <div className="flex p-1 bg-gray-100 dark:bg-gray-900 m-2 rounded-lg">
             {navigation.map((item) => {
               const isActive = pathname === item.href
               return (
@@ -152,12 +152,12 @@ export function Navigation() {
                   className={cn(
                     'flex-1 flex flex-col items-center justify-center py-3 px-2 text-xs font-medium rounded-md transition-all duration-200',
                     isActive
-                      ? 'bg-black text-white'
-                      : 'text-gray-600'
+                      ? 'bg-black dark:bg-white text-white dark:text-black'
+                      : 'text-gray-600 dark:text-gray-400'
                   )}
                 >
-                  <item.icon className={cn('w-5 h-5 mb-1', isActive ? 'text-white' : '')} />
-                  <span className={cn('text-xs', isActive ? 'text-white' : '')}>
+                  <item.icon className={cn('w-5 h-5 mb-1', isActive ? 'text-white dark:text-black' : '')} />
+                  <span className={cn('text-xs', isActive ? 'text-white dark:text-black' : '')}>
                     {item.name}
                   </span>
                 </Link>

@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       session: {
-        id: session.id,
         ...session,
         deviationBreakdown: JSON.parse(session.deviationBreakdown || '{}')
       }

@@ -14,6 +14,9 @@ import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Apple } from 'lucide-react'
 export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const router = useRouter()
+  const { login, signup } = useAuth()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,6 +64,7 @@ export default function AuthPage() {
 
   const handleSignin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     setIsLoading(true)
 
     try {
@@ -116,7 +120,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 p-6">
         <Logo size="lg" />
@@ -125,23 +129,30 @@ export default function AuthPage() {
       {/* Main Content */}
       <div className="flex items-center justify-center min-h-screen px-4">
         <div className="w-full max-w-md">
-          <Card className="shadow-xl border-0 bg-white/80 backdrop-blur">
+          <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur">
             <CardHeader className="text-center pb-6">
               <div className="mb-4">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  Welcome to SpineMate
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                  Welcome to PosturePal
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-gray-600 dark:text-gray-400">
                   Your AI-powered posture coach for a healthier workday
                 </p>
               </div>
             </CardHeader>
 
             <CardContent className="pt-0">
+              {error && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <Tabs defaultValue="signin" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="signin">Sign In</TabsTrigger>
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                  <TabsTrigger value="signin" onClick={() => setError('')}>Sign In</TabsTrigger>
+                  <TabsTrigger value="signup" onClick={() => setError('')}>Sign Up</TabsTrigger>
                 </TabsList>
 
                 {/* Sign In Form */}
@@ -150,13 +161,15 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signin-email">Email</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signin-email"
                           name="email"
                           type="email"
                           placeholder="Enter your email"
                           className="pl-10"
+                          value={signInEmail}
+                          onChange={(e) => setSignInEmail(e.target.value)}
                           required
                         />
                       </div>
@@ -165,19 +178,21 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signin-password">Password</Label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signin-password"
                           name="password"
                           type={showPassword ? "text" : "password"}
                           placeholder="Enter your password"
                           className="pl-10 pr-10"
+                          value={signInPassword}
+                          onChange={(e) => setSignInPassword(e.target.value)}
                           required
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                          className="absolute right-3 top-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
@@ -189,13 +204,13 @@ export default function AuthPage() {
                         <Checkbox id="remember" />
                         <Label htmlFor="remember" className="text-sm">Remember me</Label>
                       </div>
-                      <Button variant="link" className="p-0 h-auto text-sm text-indigo-600">
+                      <Button variant="link" className="p-0 h-auto text-sm text-indigo-600 dark:text-indigo-400" type="button">
                         Forgot password?
                       </Button>
                     </div>
 
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       className="w-full bg-indigo-600 hover:bg-indigo-700"
                       disabled={isLoading}
                     >
@@ -259,13 +274,15 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signup-name">Full Name</Label>
                       <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-name"
                           name="name"
                           type="text"
                           placeholder="Enter your full name"
                           className="pl-10"
+                          value={signUpName}
+                          onChange={(e) => setSignUpName(e.target.value)}
                           required
                         />
                       </div>
@@ -274,13 +291,15 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email</Label>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-email"
                           name="email"
                           type="email"
                           placeholder="Enter your email"
                           className="pl-10"
+                          value={signUpEmail}
+                          onChange={(e) => setSignUpEmail(e.target.value)}
                           required
                         />
                       </div>
@@ -289,36 +308,43 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="signup-password">Password</Label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-password"
                           name="password"
                           type={showPassword ? "text" : "password"}
                           placeholder="Create a password (min 8 characters)"
                           className="pl-10 pr-10"
+                          value={signUpPassword}
+                          onChange={(e) => setSignUpPassword(e.target.value)}
                           required
                           minLength={8}
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                          className="absolute right-3 top-3 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Must be at least 8 characters with letters and numbers
+                      </p>
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="signup-confirm">Confirm Password</Label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                         <Input
                           id="signup-confirm"
                           name="confirmPassword"
                           type={showPassword ? "text" : "password"}
                           placeholder="Confirm your password"
                           className="pl-10"
+                          value={signUpConfirm}
+                          onChange={(e) => setSignUpConfirm(e.target.value)}
                           required
                           minLength={8}
                         />
@@ -329,18 +355,18 @@ export default function AuthPage() {
                       <Checkbox id="terms" required />
                       <Label htmlFor="terms" className="text-sm">
                         I agree to the{' '}
-                        <Button variant="link" className="p-0 h-auto text-indigo-600">
+                        <Button variant="link" className="p-0 h-auto text-indigo-600 dark:text-indigo-400" type="button">
                           Terms of Service
                         </Button>{' '}
                         and{' '}
-                        <Button variant="link" className="p-0 h-auto text-indigo-600">
+                        <Button variant="link" className="p-0 h-auto text-indigo-600 dark:text-indigo-400" type="button">
                           Privacy Policy
                         </Button>
                       </Label>
                     </div>
 
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       className="w-full bg-indigo-600 hover:bg-indigo-700"
                       disabled={isLoading}
                     >

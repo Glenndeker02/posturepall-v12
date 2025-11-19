@@ -1,35 +1,55 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Camera, 
-  CameraOff, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Camera,
+  CameraOff,
+  CheckCircle,
+  XCircle,
   RotateCcw,
   Play,
   ChevronRight,
   ChevronLeft,
   User
 } from 'lucide-react'
+import { loadMoveNetModel, disposeDetector } from '@/lib/ai/movenet-loader'
+import { detectPoseFromVideo } from '@/lib/ai/pose-detector'
+import {
+  validatePoseForCalibration,
+  averagePosesForCalibration,
+  createCalibrationData,
+  validateCalibrationData
+} from '@/lib/ai/calibration-validator'
+import type { DetectedPose, CalibrationData as CalibrationDataType } from '@/lib/ai/types'
 
 type CalibrationStep = 'intro' | 'positioning' | 'instructions' | 'capture' | 'review' | 'complete'
 
 export default function Calibration() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
   const [currentStep, setCurrentStep] = useState<CalibrationStep>('intro')
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [isPositioningCorrect, setIsPositioningCorrect] = useState(false)
   const [isCapturing, setIsCapturing] = useState(false)
   const [captureProgress, setCaptureProgress] = useState(0)
-  const [calibrationData, setCalibrationData] = useState<any>(null)
+  const [calibrationData, setCalibrationData] = useState<CalibrationDataType | null>(null)
   const [countdown, setCountdown] = useState(0)
-  
+  const [modelLoaded, setModelLoaded] = useState(false)
+  const [modelLoadProgress, setModelLoadProgress] = useState(0)
+  const [validationIssues, setValidationIssues] = useState<string[]>([])
+  const [qualityScore, setQualityScore] = useState(0)
+  const [collectedPoses, setCollectedPoses] = useState<DetectedPose[]>([])
+  const [workstationId, setWorkstationId] = useState<string | null>(null)
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const steps = [
     { id: 'intro', title: 'Welcome to Calibration', description: 'Let\'s set up your perfect posture baseline' },
@@ -40,15 +60,94 @@ export default function Calibration() {
     { id: 'complete', title: 'Calibration Complete!', description: 'You\'re ready to start monitoring' }
   ]
 
+  // Load MoveNet model on mount
+  useEffect(() => {
+    let isMounted = true
+
+    const loadModel = async () => {
+      try {
+        await loadMoveNetModel(undefined, (progress) => {
+          if (isMounted) {
+            setModelLoadProgress(progress)
+          }
+        })
+        if (isMounted) {
+          setModelLoaded(true)
+        }
+      } catch (error) {
+        console.error('Failed to load model:', error)
+      }
+    }
+
+    loadModel()
+
+    return () => {
+      isMounted = false
+      disposeDetector()
+    }
+  }, [])
+
+  // Auth protection
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth')
+    }
+  }, [user, loading, router])
+
+  // Get workstation ID from URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const wsId = params.get('workstationId')
+    if (wsId) {
+      setWorkstationId(wsId)
+    }
+  }, [])
+
+  // Run pose detection during positioning and instructions steps
+  useEffect(() => {
+    if (!cameraEnabled || !videoRef.current || !modelLoaded) {
+      return
+    }
+
+    if (currentStep === 'positioning' || currentStep === 'instructions') {
+      detectionIntervalRef.current = setInterval(async () => {
+        if (!videoRef.current) return
+
+        try {
+          const pose = await detectPoseFromVideo(videoRef.current)
+          if (pose) {
+            const validation = validatePoseForCalibration(pose)
+            setValidationIssues(validation.issues)
+            setQualityScore(validation.qualityScore)
+            setIsPositioningCorrect(validation.isValid)
+          }
+        } catch (error) {
+          console.error('Pose detection error:', error)
+        }
+      }, 500) // Check every 500ms
+    } else {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current)
+        detectionIntervalRef.current = null
+      }
+    }
+
+    return () => {
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current)
+      }
+    }
+  }, [cameraEnabled, currentStep, modelLoaded])
+
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           width: { ideal: 640 },
           height: { ideal: 480 }
-        } 
+        }
       })
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         streamRef.current = stream
@@ -56,9 +155,7 @@ export default function Calibration() {
       }
     } catch (error) {
       console.error('Camera access denied:', error)
-      // Simulate camera for demo
-      setCameraEnabled(true)
-      setTimeout(() => setIsPositioningCorrect(true), 2000)
+      alert('Camera access is required for calibration. Please grant camera permissions.')
     }
   }
 
@@ -89,31 +186,66 @@ export default function Calibration() {
     }, 1000)
   }
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
+    if (!videoRef.current) return
+
     setCaptureProgress(0)
-    const analysisInterval = setInterval(() => {
-      setCaptureProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(analysisInterval)
-          completeCapture()
-          return 100
+    setCollectedPoses([])
+
+    // Collect 10 poses over 2 seconds (5 fps)
+    const framesToCollect = 10
+    let framesCollected = 0
+
+    const captureInterval = setInterval(async () => {
+      if (!videoRef.current) {
+        clearInterval(captureInterval)
+        return
+      }
+
+      try {
+        const pose = await detectPoseFromVideo(videoRef.current)
+        if (pose) {
+          setCollectedPoses(prev => [...prev, pose])
+          framesCollected++
+          setCaptureProgress((framesCollected / framesToCollect) * 100)
+
+          if (framesCollected >= framesToCollect) {
+            clearInterval(captureInterval)
+            completeCapture()
+          }
         }
-        return prev + 20
-      })
-    }, 200)
+      } catch (error) {
+        console.error('Pose capture error:', error)
+      }
+    }, 200) // Capture frame every 200ms
   }
 
   const completeCapture = () => {
     setIsCapturing(false)
-    // Simulate calibration data
-    setCalibrationData({
-      headAngle: 2.5,
-      shoulderSymmetry: 98.5,
-      spineAlignment: 95.2,
-      confidence: 92,
-      timestamp: new Date().toISOString()
-    })
-    setCurrentStep('review')
+
+    try {
+      // Average the collected poses
+      const averagedPose = averagePosesForCalibration(collectedPoses)
+
+      // Create calibration data
+      const newCalibrationData = createCalibrationData(averagedPose)
+
+      // Validate calibration data
+      const validation = validateCalibrationData(newCalibrationData)
+
+      if (!validation.isValid) {
+        alert(`Calibration quality issues: ${validation.issues.join(', ')}. Please try again.`)
+        retakeCalibration()
+        return
+      }
+
+      setCalibrationData(newCalibrationData)
+      setCurrentStep('review')
+    } catch (error) {
+      console.error('Calibration error:', error)
+      alert('Failed to create calibration. Please try again.')
+      retakeCalibration()
+    }
   }
 
   const retakeCalibration = () => {
@@ -122,10 +254,34 @@ export default function Calibration() {
     setCurrentStep('positioning')
   }
 
-  const completeCalibration = () => {
-    // Save calibration data and redirect to dashboard
-    console.log('Calibration completed:', calibrationData)
-    window.location.href = '/'
+  const completeCalibration = async () => {
+    if (!calibrationData || !workstationId) {
+      alert('Missing calibration data or workstation ID')
+      return
+    }
+
+    try {
+      // Save calibration data to database
+      const response = await fetch(`/api/workstations/${workstationId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          calibrationData: calibrationData
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save calibration')
+      }
+
+      // Redirect to dashboard
+      window.location.href = '/dashboard'
+    } catch (error) {
+      console.error('Error saving calibration:', error)
+      alert('Failed to save calibration. Please try again.')
+    }
   }
 
   const nextStep = () => {
@@ -168,10 +324,18 @@ export default function Calibration() {
             <div>
               <h2 className="text-3xl font-bold mb-4">Let's Calibrate Your Perfect Posture</h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                This one-time setup helps Spine Mate learn what good posture looks like for your body. 
+                This one-time setup helps PosturePal learn what good posture looks like for your body.
                 We'll capture your ideal posture and use it as a baseline for real-time monitoring.
               </p>
             </div>
+            {!modelLoaded && (
+              <div className="max-w-md mx-auto">
+                <Progress value={modelLoadProgress} className="h-2" />
+                <p className="text-sm text-gray-500 mt-2">
+                  Loading AI model... {modelLoadProgress}%
+                </p>
+              </div>
+            )}
             <div className="bg-blue-50 p-6 rounded-lg max-w-md mx-auto">
               <h3 className="font-semibold text-blue-800 mb-3">What you'll need:</h3>
               <ul className="text-left text-blue-700 space-y-2">
@@ -287,11 +451,35 @@ export default function Calibration() {
                     </div>
                   </div>
                 </div>
-                
-                {!isPositioningCorrect && (
+
+                {!isPositioningCorrect && validationIssues.length > 0 && (
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <p className="text-sm text-yellow-800 font-semibold mb-2">
+                      Issues detected:
+                    </p>
+                    <ul className="text-sm text-yellow-700 space-y-1">
+                      {validationIssues.map((issue, idx) => (
+                        <li key={idx}>• {issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {!isPositioningCorrect && validationIssues.length === 0 && (
                   <div className="bg-yellow-50 p-4 rounded-lg">
                     <p className="text-sm text-yellow-800">
                       <strong>Tip:</strong> Prop your phone against a stack of books or use a stand for stability.
+                    </p>
+                  </div>
+                )}
+
+                {isPositioningCorrect && qualityScore > 0 && (
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <p className="text-sm text-green-800 font-semibold">
+                      Quality Score: {qualityScore}%
+                    </p>
+                    <p className="text-sm text-green-700 mt-1">
+                      Perfect positioning! You're ready to continue.
                     </p>
                   </div>
                 )}
@@ -451,20 +639,20 @@ export default function Calibration() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                     <span className="text-sm font-medium">Head Angle</span>
-                    <Badge variant="outline">{calibrationData?.headAngle}°</Badge>
+                    <Badge variant="outline">{calibrationData?.baselineAngles?.headAngle.toFixed(1)}°</Badge>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium">Shoulder Symmetry</span>
-                    <Badge variant="outline">{calibrationData?.shoulderSymmetry}%</Badge>
+                    <span className="text-sm font-medium">Shoulder Angle</span>
+                    <Badge variant="outline">{((calibrationData?.baselineAngles?.shoulderAngle || 0) * (180 / Math.PI)).toFixed(1)}°</Badge>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                     <span className="text-sm font-medium">Spine Alignment</span>
-                    <Badge variant="outline">{calibrationData?.spineAlignment}%</Badge>
+                    <Badge variant="outline">{calibrationData?.baselineAngles?.spineAngle.toFixed(1)}°</Badge>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium">Confidence Score</span>
-                    <Badge className="bg-green-100 text-green-800">
-                      {calibrationData?.confidence}% accurate
+                    <span className="text-sm font-medium">Quality Score</span>
+                    <Badge className={calibrationData && calibrationData.qualityScore >= 70 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                      {calibrationData?.qualityScore}% accurate
                     </Badge>
                   </div>
                 </div>

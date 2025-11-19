@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     }
 
     const user = await db.user.findUnique({
-      where: userId ? { id: userId } : { email },
+      where: userId ? { id: userId } : { email: email! },
       include: {
         postureSessions: {
           orderBy: { startTime: 'desc' },

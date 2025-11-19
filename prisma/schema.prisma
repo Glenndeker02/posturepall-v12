@@ -41,6 +41,29 @@ model User {
   breakSessions     BreakSession[]
   achievements      UserAchievement[]
   goals             Goal[]
+  workstations      Workstation[]
+  dailyStats        DailyStats[]
+  pairedDevices     PairedDevice[]
+  subscriptions     Subscription[]
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  userId               String
+  stripeSubscriptionId String   @unique
+  stripePriceId        String
+  stripeCustomerId     String
+  status               String   // active, canceled, past_due, trialing
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripeSubscriptionId])
 }
 
 model Account {
@@ -81,20 +104,59 @@ model VerificationToken {
 model PostureSession {
   id                  String   @id @default(cuid())
   userId              String
+  workstationId       String?  // optional: which workstation was used
   startTime           DateTime
   endTime             DateTime?
   duration            Int?     // in minutes
   overallScore        Int?     // 0-100
   goodPosturePercent  Float?   // percentage
-  deviationBreakdown  String?  // JSON object
+  deviationBreakdown  String?  // JSON object with time in each quality category
   alertsReceived      Int?     // number of alerts
   correctionSpeed     Float?   // average time to correct in seconds
   pointsEarned        Int?
+  bonusPoints         Int?     // bonus points for achievements
+
+  // Detailed metrics
+  timeExcellent       Int?     // seconds in excellent posture
+  timeGood            Int?     // seconds in good posture
+  timeFair            Int?     // seconds in fair posture
+  timePoor            Int?     // seconds in poor posture
+
+  // Alert breakdown
+  postureAlerts       Int?     // number of posture correction alerts
+  breakReminders      Int?     // number of break reminders
+
+  // Problem areas tracking
+  problemAreas        String?  // JSON object with frequency by body part
+  mostCommonIssue     String?  // most frequent deviation type
+
+  // Posture quality timeline
+  postureTimeline     String?  // JSON array of {timestamp, score} for graph
+
+  // Personal records
+  longestGoodStreak   Int?     // longest continuous good posture in seconds
+  isPersonalRecord    Boolean  @default(false)
+  recordType          String?  // type of record if applicable
+
+  // Environmental factors
+  avgScreenDistance   Float?   // average distance from screen in cm
+  lightingQuality     String?  // good/fair/poor
+
+  // AI insights
+  aiInsights          String?  // JSON array of personalized insights
+  recommendations     String?  // JSON array of action recommendations
+
   mobileSynced        Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
-  
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workstation         Workstation? @relation(fields: [workstationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([workstationId])
+  @@index([startTime])
+  @@index([userId, startTime])
 }
 
 model BreakSession {
@@ -108,8 +170,11 @@ model BreakSession {
   mobileSynced  Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Exercise {
@@ -147,8 +212,10 @@ model UserAchievement {
   
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   achievement   Achievement @relation(fields: [achievementId], references: [id])
-  
+
   @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
 }
 
 model Goal {
@@ -163,6 +230,89 @@ model Goal {
   isCompleted Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isCompleted])
+  @@index([deadline])
+}
+
+model Workstation {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String   // e.g., "Home Office", "Work Desk", "Study Room"
+  location        String?  // Additional description (e.g., "Main bedroom", "Corner office")
+  calibrationData String?  // JSON CalibrationData object from posture calibration
+  isDefault       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postureSessions PostureSession[]
+
+  @@index([userId])
+}
+
+model DailyStats {
+  id                  String   @id @default(cuid())
+  userId              String
+  date                DateTime // date for these stats (day start)
+
+  // Daily metrics
+  postureScore        Int?     // average posture score for the day (0-100)
+  sessionCount        Int      @default(0) // number of sessions
+  totalDuration       Int      @default(0) // total minutes monitored
+  pointsEarned        Int      @default(0) // points earned this day
+
+  // Break metrics
+  breaksScheduled     Int      @default(0) // number of breaks that should have occurred
+  breaksCompleted     Int      @default(0) // number of breaks completed
+  breaksSnoozed       Int      @default(0) // number of breaks snoozed
+  breaksSkipped       Int      @default(0) // number of breaks skipped
+
+  // Posture quality breakdown (minutes)
+  timeExcellent       Int      @default(0) // minutes in excellent posture
+  timeGood            Int      @default(0) // minutes in good posture
+  timeFair            Int      @default(0) // minutes in fair posture
+  timePoor            Int      @default(0) // minutes in poor posture
+
+  // Streak status
+  dailyGoalMet        Boolean  @default(false)
+  breakGoalMet        Boolean  @default(false)
+
+  // Problem areas (JSON)
+  problemAreas        String?  // JSON object with frequency by body part
+
+  // Best session of the day
+  bestSessionScore    Int?     // highest scoring session
+  bestSessionId       String?  // reference to that session
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model PairedDevice {
+  id              String   @id @default(cuid())
+  userId          String
+  deviceId        String   @unique // unique identifier from mobile app
+  deviceName      String   // e.g., "iPhone 14 Pro", "Samsung Galaxy S23"
+  deviceType      String   // ios, android
+  pairingCode     String   @unique // temporary code used for pairing
+  fcmToken        String?  // Firebase Cloud Messaging token for push notifications
+  isActive        Boolean  @default(true)
+  lastSyncedAt    DateTime @default(now())
+  lastActiveAt    DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([pairingCode])
 }

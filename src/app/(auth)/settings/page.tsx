@@ -12,11 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/logo'
-import { 
-  User, 
-  Bell, 
-  Shield, 
-  Monitor, 
+import {
+  User,
+  Bell,
+  Shield,
+  Monitor,
   Volume2,
   Eye,
   Camera,
@@ -36,17 +36,50 @@ import {
   Home,
   Activity,
   Dumbbell,
-  Settings
+  Settings,
+  CreditCard,
+  Crown
 } from 'lucide-react'
+
+interface UserSettings {
+  id: string
+  email: string
+  name: string | null
+  avatar: string | null
+  subscriptionTier: string
+  workEnvironment: string | null
+  dailySittingHours: number | null
+  painAreas: string[]
+  workSchedule: any
+  userGoals: any
+  dailyGoalScore: number
+  weeklyGoalScore: number
+  breakRemindersEnabled: boolean
+  streakRemindersEnabled: boolean
+  currentStreak: number
+  longestStreak: number
+  totalPoints: number
+  totalSessions: number
+  totalBreaks: number
+  createdAt: string
+  stripeCustomerId: string | null
+  stripeSubscriptionId: string | null
+  stripeCurrentPeriodEnd: string | null
+}
 
 export default function SettingsPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [notifications, setNotifications] = useState({
-    postureAlerts: true,
-    breakReminders: true,
-    achievements: true,
-    weeklyReports: false
-  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [userData, setUserData] = useState<UserSettings | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Form state
+  const [name, setName] = useState('')
+  const [workEnvironment, setWorkEnvironment] = useState('')
+  const [dailySittingHours, setDailySittingHours] = useState(8)
+  const [breakRemindersEnabled, setBreakRemindersEnabled] = useState(true)
+  const [streakRemindersEnabled, setStreakRemindersEnabled] = useState(true)
 
   const [preferences, setPreferences] = useState({
     alertSensitivity: [30],
@@ -65,35 +98,160 @@ export default function SettingsPage() {
 
   const router = useRouter()
 
-  // Check authentication on mount
+  // Fetch user settings
   useEffect(() => {
-    const hasToken = localStorage.getItem('authToken') || sessionStorage.getItem('userSession')
-    
-    if (!hasToken) {
-      // Not authenticated, redirect to auth page
-      router.push('/auth')
-      return
+    const fetchSettings = async () => {
+      const token = localStorage.getItem('auth_token')
+
+      if (!token) {
+        router.push('/auth')
+        return
+      }
+
+      try {
+        const response = await fetch('/api/user/settings', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            localStorage.removeItem('auth_token')
+            router.push('/auth')
+            return
+          }
+          throw new Error('Failed to fetch settings')
+        }
+
+        const data: UserSettings = await response.json()
+        setUserData(data)
+
+        // Populate form fields
+        setName(data.name || '')
+        setWorkEnvironment(data.workEnvironment || 'home')
+        setDailySittingHours(data.dailySittingHours || 8)
+        setBreakRemindersEnabled(data.breakRemindersEnabled)
+        setStreakRemindersEnabled(data.streakRemindersEnabled)
+
+        setIsAuthenticated(true)
+      } catch (err) {
+        console.error('Settings fetch error:', err)
+        setError('Failed to load settings')
+      } finally {
+        setIsLoading(false)
+      }
     }
-    
-    setIsAuthenticated(true)
+
+    fetchSettings()
   }, [router])
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken')
-    sessionStorage.removeItem('userSession')
+  const handleSaveProfile = async () => {
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch('/api/user/settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name,
+          workEnvironment,
+          dailySittingHours,
+          breakRemindersEnabled,
+          streakRemindersEnabled,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings')
+      }
+
+      const result = await response.json()
+      if (result.success) {
+        // Refresh user data
+        const refreshResponse = await fetch('/api/user/settings', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        const refreshedData = await refreshResponse.json()
+        setUserData(refreshedData)
+
+        alert('Settings saved successfully!')
+      }
+    } catch (err) {
+      console.error('Save error:', err)
+      setError('Failed to save settings')
+      alert('Failed to save settings. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleManageSubscription = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          returnUrl: window.location.href,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create portal session')
+      }
+
+      const { url } = await response.json()
+      if (url) {
+        window.location.href = url
+      }
+    } catch (err) {
+      console.error('Portal error:', err)
+      alert('Failed to open subscription management. Please try again.')
+    }
+  }
+
+  const handleLogout = async () => {
+    const token = localStorage.getItem('auth_token')
+
+    // Call logout endpoint
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
+
+    localStorage.removeItem('auth_token')
     router.push('/')
   }
 
-  // Show loading while checking authentication
-  if (!isAuthenticated) {
+  // Show loading while fetching
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <Logo size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading settings...</p>
         </div>
       </div>
     )
+  }
+
+  if (!isAuthenticated || !userData) {
+    return null
   }
 
   return (
@@ -130,8 +288,10 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">S</span>
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-medium">
+                  {userData.name ? userData.name[0].toUpperCase() : userData.email[0].toUpperCase()}
+                </span>
               </div>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
@@ -170,25 +330,34 @@ export default function SettingsPage() {
                   <CardDescription>Update your personal information and preferences</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" defaultValue="Sarah" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" defaultValue="Johnson" />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter your name"
+                    />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" defaultValue="sarah.johnson@example.com" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={userData.email}
+                      disabled
+                      className="bg-gray-100 dark:bg-gray-800"
+                    />
+                    <p className="text-xs text-gray-500">Email cannot be changed</p>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="workType">Work Environment</Label>
-                    <Select defaultValue="home">
+                    <Select
+                      value={workEnvironment}
+                      onValueChange={setWorkEnvironment}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -202,22 +371,29 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="goals">Primary Goals</Label>
-                    <Select defaultValue="pain">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pain">Reduce Existing Pain</SelectItem>
-                        <SelectItem value="prevent">Prevent Future Problems</SelectItem>
-                        <SelectItem value="productivity">Improve Focus & Productivity</SelectItem>
-                        <SelectItem value="habits">Build Healthy Habits</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="sittingHours">Daily Sitting Hours</Label>
+                    <Input
+                      id="sittingHours"
+                      type="number"
+                      min="0"
+                      max="24"
+                      value={dailySittingHours}
+                      onChange={(e) => setDailySittingHours(parseInt(e.target.value) || 0)}
+                    />
                   </div>
 
-                  <Button className="w-full">
-                    Save Changes
+                  {error && (
+                    <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+                      {error}
+                    </div>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    onClick={handleSaveProfile}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </CardContent>
               </Card>
@@ -229,29 +405,40 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-900">87%</div>
-                      <p className="text-sm text-gray-600">Current Posture Score</p>
+                    <div className="text-center py-4">
+                      <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                        {userData.totalPoints}
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Total Points</p>
                     </div>
-                    
+
                     <div className="space-y-3">
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Member Since</span>
-                        <span className="text-sm font-medium">Oct 2024</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Member Since</span>
+                        <span className="text-sm font-medium dark:text-gray-300">
+                          {new Date(userData.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Total Sessions</span>
-                        <span className="text-sm font-medium">156</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Total Sessions</span>
+                        <span className="text-sm font-medium dark:text-gray-300">{userData.totalSessions}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Best Streak</span>
-                        <span className="text-sm font-medium">12 days</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Best Streak</span>
+                        <span className="text-sm font-medium dark:text-gray-300">{userData.longestStreak} days</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Total Breaks</span>
+                        <span className="text-sm font-medium dark:text-gray-300">{userData.totalBreaks}</span>
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t">
-                      <Button variant="outline" className="w-full">
-                        View Full Profile
+                    <div className="pt-4 border-t dark:border-gray-700">
+                      <Button variant="outline" className="w-full" asChild>
+                        <a href="/dashboard">View Dashboard</a>
                       </Button>
                     </div>
                   </div>
@@ -273,54 +460,30 @@ export default function SettingsPage() {
                 <CardContent className="space-y-6">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Posture Alerts</Label>
-                      <p className="text-sm text-gray-600">Get notified when you slouch</p>
-                    </div>
-                    <Switch 
-                      checked={notifications.postureAlerts}
-                      onCheckedChange={(checked) => 
-                        setNotifications(prev => ({...prev, postureAlerts: checked}))
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
                       <Label>Break Reminders</Label>
-                      <p className="text-sm text-gray-600">Regular stretch break notifications</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Regular stretch break notifications</p>
                     </div>
-                    <Switch 
-                      checked={notifications.breakReminders}
-                      onCheckedChange={(checked) => 
-                        setNotifications(prev => ({...prev, breakReminders: checked}))
-                      }
+                    <Switch
+                      checked={breakRemindersEnabled}
+                      onCheckedChange={setBreakRemindersEnabled}
                     />
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Achievement Alerts</Label>
-                      <p className="text-sm text-gray-600">Celebrate your milestones</p>
+                      <Label>Streak Reminders</Label>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Stay motivated with streak alerts</p>
                     </div>
-                    <Switch 
-                      checked={notifications.achievements}
-                      onCheckedChange={(checked) => 
-                        setNotifications(prev => ({...prev, achievements: checked}))
-                      }
+                    <Switch
+                      checked={streakRemindersEnabled}
+                      onCheckedChange={setStreakRemindersEnabled}
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Weekly Reports</Label>
-                      <p className="text-sm text-gray-600">Summary of your progress</p>
-                    </div>
-                    <Switch 
-                      checked={notifications.weeklyReports}
-                      onCheckedChange={(checked) => 
-                        setNotifications(prev => ({...prev, weeklyReports: checked}))
-                      }
-                    />
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p className="text-sm text-blue-700 dark:text-blue-400">
+                      Notification settings will be saved when you click "Save Changes" in the Profile tab.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -611,6 +774,101 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="account" className="space-y-6">
+            {/* Subscription Card */}
+            <Card className={`${
+              userData.subscriptionTier === 'premium'
+                ? 'border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/30 dark:to-purple-950/30'
+                : ''
+            }`}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Subscription
+                  </div>
+                  {userData.subscriptionTier === 'premium' && (
+                    <Badge className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                      <Crown className="w-3 h-3 mr-1" />
+                      Premium
+                    </Badge>
+                  )}
+                  {userData.subscriptionTier === 'free' && (
+                    <Badge variant="secondary">Free Plan</Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {userData.subscriptionTier === 'premium'
+                    ? 'You have access to all premium features'
+                    : 'Upgrade to unlock premium features'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {userData.subscriptionTier === 'premium' ? (
+                  <>
+                    <div className="space-y-2">
+                      {userData.stripeCurrentPeriodEnd && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Next billing date:</span>
+                          <span className="font-medium dark:text-gray-300">
+                            {new Date(userData.stripeCurrentPeriodEnd).toLocaleDateString('en-US', {
+                              month: 'long',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Plan:</span>
+                        <span className="font-medium dark:text-gray-300">Premium Monthly - $9.99/mo</span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleManageSubscription}
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Manage Subscription
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/50 dark:to-purple-950/50 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                      <h4 className="font-semibold text-indigo-900 dark:text-indigo-300 mb-2">Upgrade to Premium</h4>
+                      <ul className="space-y-1 text-sm text-indigo-700 dark:text-indigo-400">
+                        <li className="flex items-center">
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          AI-powered insights
+                        </li>
+                        <li className="flex items-center">
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Advanced analytics
+                        </li>
+                        <li className="flex items-center">
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Unlimited workstations
+                        </li>
+                        <li className="flex items-center">
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Mobile app sync
+                        </li>
+                      </ul>
+                    </div>
+                    <Button
+                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                      asChild
+                    >
+                      <a href="/pricing">
+                        <Crown className="w-4 h-4 mr-2" />
+                        Upgrade to Premium
+                      </a>
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -621,19 +879,19 @@ export default function SettingsPage() {
                   <CardDescription>Manage your account security</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start" disabled>
                     <Lock className="w-4 h-4 mr-2" />
-                    Change Password
+                    Change Password (Coming Soon)
                   </Button>
-                  
-                  <Button variant="outline" className="w-full justify-start">
+
+                  <Button variant="outline" className="w-full justify-start" disabled>
                     <Shield className="w-4 h-4 mr-2" />
-                    Two-Factor Authentication
+                    Two-Factor Authentication (Coming Soon)
                   </Button>
-                  
-                  <Button variant="outline" className="w-full justify-start">
+
+                  <Button variant="outline" className="w-full justify-start" disabled>
                     <Smartphone className="w-4 h-4 mr-2" />
-                    Connected Devices
+                    Connected Devices (Coming Soon)
                   </Button>
                 </CardContent>
               </Card>
@@ -647,19 +905,19 @@ export default function SettingsPage() {
                   <CardDescription>Get help and learn more</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button variant="outline" className="w-full justify-start" disabled>
                     <HelpCircle className="w-4 h-4 mr-2" />
-                    Help Center
+                    Help Center (Coming Soon)
                   </Button>
-                  
-                  <Button variant="outline" className="w-full justify-start">
+
+                  <Button variant="outline" className="w-full justify-start" disabled>
                     <Globe className="w-4 h-4 mr-2" />
-                    Privacy Policy
+                    Privacy Policy (Coming Soon)
                   </Button>
-                  
-                  <Button variant="outline" className="w-full justify-start">
+
+                  <Button variant="outline" className="w-full justify-start" disabled>
                     <Target className="w-4 h-4 mr-2" />
-                    Terms of Service
+                    Terms of Service (Coming Soon)
                   </Button>
                 </CardContent>
               </Card>

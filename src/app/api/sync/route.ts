@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const syncResults = {
       sessionsSynced: 0,
       breaksSynced: 0,
-      errors: []
+      errors: [] as string[]
     }
 
     // Sync posture sessions

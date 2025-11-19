@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Logo } from '@/components/logo'
-import { 
+import { useAuth } from '@/contexts/AuthContext'
+import { MobilePairingDialog } from '@/components/pairing/mobile-pairing-dialog'
+import {
   Play,
   Coffee,
   Calendar,
@@ -21,11 +24,35 @@ import {
   Award,
   Zap,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Dumbbell,
+  Smartphone
 } from 'lucide-react'
 
+interface DashboardData {
+  todayScore: number
+  yesterdayScore: number
+  sessionTime: number
+  sessionCount: number
+  breakCount: number
+  breakCompletionRate: number
+  currentStreak: number
+  longestStreak: number
+  pointsToday: number
+  totalPoints: number
+  weeklyGoalProgress: number
+  recentSessions: any[]
+  insights: string[]
+  problemAlerts: any[]
+}
+
 export default function Dashboard() {
+  const { user, logout } = useAuth()
+  const router = useRouter()
   const [greeting, setGreeting] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [showPairingDialog, setShowPairingDialog] = useState(false)
 
   // Set greeting based on time of day
   useEffect(() => {
@@ -39,362 +66,435 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user) return
+
+      try {
+        const response = await fetch(`/api/dashboard?userId=${user.id}`)
+
+        if (response.ok) {
+          const data = await response.json()
+          setDashboardData(data)
+        } else {
+          console.error('Failed to fetch dashboard data')
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [user])
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <Logo size="lg" className="mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-600 dark:text-green-500'
+    if (score >= 70) return 'text-yellow-600 dark:text-yellow-500'
+    if (score >= 60) return 'text-orange-600 dark:text-orange-500'
+    return 'text-red-600 dark:text-red-500'
+  }
+
+  const getScoreLabel = (score: number) => {
+    if (score >= 80) return 'Excellent'
+    if (score >= 70) return 'Good posture'
+    if (score >= 60) return 'Fair'
+    return 'Needs improvement'
+  }
+
+  const todayScore = dashboardData?.todayScore || 0
+  const yesterdayScore = dashboardData?.yesterdayScore || 0
+  const scoreDiff = todayScore - yesterdayScore
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* SECTION 1: HERO SECTION */}
       <section className="mb-8">
-        <div className="flex items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mr-3">
-            {greeting}, Sarah! 👋
-          </h2>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+              {greeting}, {user.name || 'there'}! 👋
+            </h2>
+            {dashboardData && dashboardData.currentStreak > 0 && (
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                You're on a {dashboardData.currentStreak}-day streak. Keep the momentum going!
+              </p>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={logout}>
+            Logout
+          </Button>
         </div>
-        <p className="text-lg text-gray-600 mb-6">
-          You're on a 12-day streak. Keep the momentum going!
-        </p>
-        
+
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Today's Posture Score */}
           <Card>
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6 text-center">TODAY'S POSTURE SCORE</h3>
-              
-              {/* Circular Progress Ring */}
-              <div className="relative w-48 h-48 mx-auto mb-6">
-                <svg className="w-48 h-48 transform -rotate-90">
-                  <circle cx="96" cy="96" r="88" stroke="#e5e7eb" strokeWidth="12" fill="none" />
-                  <circle
-                    cx="96" cy="96" r="88"
-                    stroke="url(#gradient)"
-                    strokeWidth="12"
-                    fill="none"
-                    strokeDasharray={`${2 * Math.PI * 88}`}
-                    strokeDashoffset={`${2 * Math.PI * 88 * (1 - 78/100)}`}
-                    className="transition-all duration-500"
-                  />
-                  <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#10b981" />
-                      <stop offset="100%" stopColor="#059669" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-bold text-gray-900">78%</span>
-                  <span className="text-sm text-gray-500">Good posture</span>
-                </div>
-              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6 text-center">TODAY'S POSTURE SCORE</h3>
 
-              <div className="text-center space-y-2">
-                <div className="flex items-center justify-center space-x-2">
-                  <TrendingUp className="w-4 h-4 text-green-500" />
-                  <span className="text-sm text-gray-600">5% better than yesterday</span>
+              {loading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                 </div>
-                <div className="text-xs text-gray-500">
-                  22% toward your 80% weekly goal
-                </div>
-              </div>
+              ) : (
+                <>
+                  {/* Circular Progress Ring */}
+                  <div className="relative w-48 h-48 mx-auto mb-6">
+                    <svg className="w-48 h-48 transform -rotate-90">
+                      <circle cx="96" cy="96" r="88" className="stroke-gray-200 dark:stroke-gray-700" strokeWidth="12" fill="none" />
+                      <circle
+                        cx="96" cy="96" r="88"
+                        stroke={todayScore >= 80 ? "url(#gradient-green)" : todayScore >= 70 ? "url(#gradient-yellow)" : "url(#gradient-orange)"}
+                        strokeWidth="12"
+                        fill="none"
+                        strokeDasharray={`${2 * Math.PI * 88}`}
+                        strokeDashoffset={`${2 * Math.PI * 88 * (1 - todayScore/100)}`}
+                        className="transition-all duration-500"
+                      />
+                      <defs>
+                        <linearGradient id="gradient-green" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#10b981" />
+                          <stop offset="100%" stopColor="#059669" />
+                        </linearGradient>
+                        <linearGradient id="gradient-yellow" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#f59e0b" />
+                          <stop offset="100%" stopColor="#d97706" />
+                        </linearGradient>
+                        <linearGradient id="gradient-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#f97316" />
+                          <stop offset="100%" stopColor="#ea580c" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className={`text-4xl font-bold ${getScoreColor(todayScore)}`}>
+                        {todayScore}%
+                      </span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">{getScoreLabel(todayScore)}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-center space-y-2">
+                    {scoreDiff !== 0 && (
+                      <div className="flex items-center justify-center space-x-2">
+                        {scoreDiff > 0 ? (
+                          <>
+                            <TrendingUp className="w-4 h-4 text-green-500" />
+                            <span className="text-sm text-green-600 dark:text-green-500">
+                              {scoreDiff}% better than yesterday
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {Math.abs(scoreDiff)}% lower than yesterday
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {dashboardData && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {dashboardData.weeklyGoalProgress}% toward your {user.weeklyGoalScore}% weekly goal
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
           {/* Quick Actions */}
           <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Button className="h-20 flex flex-col bg-green-600 hover:bg-green-700 text-white">
-                  <Play className="w-6 h-6 mb-2" />
-                  <span>Start Session</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col">
-                  <Coffee className="w-6 h-6 mb-2" />
-                  <span>Quick Break</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col">
-                  <Target className="w-6 h-6 mb-2" />
-                  <span>View Goals</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col">
-                  <Trophy className="w-6 h-6 mb-2" />
-                  <span>Achievements</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* SECTION 2: TODAY'S SNAPSHOT */}
-      <section className="mb-8">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Today's Snapshot</h3>
-        <div className="grid md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Clock className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-gray-900">3h 24m</div>
-              <div className="text-sm text-gray-500">Active today</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Coffee className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-gray-900">5 of 6</div>
-              <div className="text-sm text-gray-500">Breaks completed</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Flame className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-gray-900">12 days</div>
-              <div className="text-sm text-gray-500">Current streak</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <Star className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-gray-900">+287</div>
-              <div className="text-sm text-gray-500">Points earned</div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* SECTION 3: INSIGHTS & ALERTS */}
-      <section className="mb-8">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Insights & Alerts</h3>
-        <div className="grid lg:grid-cols-2 gap-6">
-          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-yellow-500 mr-2" />
-                Attention Needed
-              </CardTitle>
+              <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full mr-3"></div>
-                  <div>
-                    <p className="text-sm font-medium">4 breaks skipped today</p>
-                    <p className="text-xs text-gray-500">Posture score drops when breaks are missed</p>
-                  </div>
+              <Button
+                className="w-full justify-start bg-indigo-600 hover:bg-indigo-700 text-white"
+                size="lg"
+                onClick={() => router.push('/posture')}
+              >
+                <Play className="w-5 h-5 mr-3" />
+                <div className="text-left">
+                  <div className="font-semibold">Start Session</div>
+                  <div className="text-xs opacity-90">Begin real-time monitoring</div>
                 </div>
-                <Button size="sm" variant="outline">Schedule</Button>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                  <div>
-                    <p className="text-sm font-medium">Calibration due in 2 days</p>
-                    <p className="text-xs text-gray-500">Maintain accuracy of posture detection</p>
-                  </div>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                size="lg"
+                onClick={() => router.push('/breaks')}
+              >
+                <Coffee className="w-5 h-5 mr-3 text-orange-600 dark:text-orange-500" />
+                <div className="text-left">
+                  <div className="font-semibold">Take a Break</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Guided stretches & exercises</div>
                 </div>
-                <Button size="sm" variant="outline">Calibrate</Button>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                size="lg"
+                onClick={() => router.push('/exercises')}
+              >
+                <Dumbbell className="w-5 h-5 mr-3 text-purple-600 dark:text-purple-500" />
+                <div className="text-left">
+                  <div className="font-semibold">Browse Exercises</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">23 exercises available</div>
+                </div>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                size="lg"
+                onClick={() => router.push('/calibration')}
+              >
+                <Target className="w-5 h-5 mr-3 text-blue-600 dark:text-blue-500" />
+                <div className="text-left">
+                  <div className="font-semibold">Calibrate Workstation</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Set your ideal posture</div>
+                </div>
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full justify-start border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                size="lg"
+                onClick={() => setShowPairingDialog(true)}
+              >
+                <Smartphone className="w-5 h-5 mr-3 text-indigo-600 dark:text-indigo-500" />
+                <div className="text-left">
+                  <div className="font-semibold">Connect Mobile App</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Sync with your phone</div>
+                </div>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Mobile Pairing Dialog */}
+      {user && (
+        <MobilePairingDialog
+          open={showPairingDialog}
+          onOpenChange={setShowPairingDialog}
+          userId={user.id}
+        />
+      )}
+
+      {/* SECTION 2: TODAY'S STATS */}
+      <section className="mb-8">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Today's Activity</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Clock className="w-8 h-8 mx-auto mb-2 text-blue-600 dark:text-blue-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {loading ? '--' : `${dashboardData?.sessionTime || 0}m`}
               </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Session Time</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Activity className="w-8 h-8 mx-auto mb-2 text-green-600 dark:text-green-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {loading ? '--' : dashboardData?.sessionCount || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Sessions</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Coffee className="w-8 h-8 mx-auto mb-2 text-orange-600 dark:text-orange-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {loading ? '--' : `${dashboardData?.breakCount || 0}`}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Breaks Taken</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 text-center">
+              <Zap className="w-8 h-8 mx-auto mb-2 text-yellow-600 dark:text-yellow-500" />
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                {loading ? '--' : dashboardData?.pointsToday || 0}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Points Earned</div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* SECTION 3: STREAKS & ACHIEVEMENTS */}
+      <section className="mb-8">
+        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Streaks & Progress</h3>
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-orange-500" />
+                Daily Streak
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center mb-4">
+                <div className="text-5xl font-bold text-orange-600 dark:text-orange-500 mb-2">
+                  {loading ? '--' : dashboardData?.currentStreak || 0}
+                </div>
+                <div className="text-gray-600 dark:text-gray-400">
+                  days in a row
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Longest streak:</span>
+                <span className="font-semibold dark:text-gray-200">
+                  {loading ? '--' : dashboardData?.longestStreak || 0} days
+                </span>
+              </div>
+              <Progress
+                value={loading ? 0 : ((dashboardData?.currentStreak || 0) / (dashboardData?.longestStreak || 1)) * 100}
+                className="mt-3"
+              />
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <Zap className="w-5 h-5 text-green-500 mr-2" />
-                AI Insights
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-600 dark:text-yellow-500" />
+                Total Points
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-sm font-medium text-green-800 mb-1">Best posture time: 9-11 AM</p>
-                <p className="text-xs text-gray-600">Schedule important work during these hours for optimal posture</p>
+            <CardContent>
+              <div className="text-center mb-4">
+                <div className="text-5xl font-bold text-indigo-600 dark:text-indigo-500 mb-2">
+                  {loading ? '--' : user.totalPoints || 0}
+                </div>
+                <div className="text-gray-600 dark:text-gray-400">
+                  lifetime points
+                </div>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-blue-800 mb-1">30% faster correction this week</p>
-                <p className="text-xs text-gray-600">Your posture awareness is improving significantly!</p>
-              </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <p className="text-sm font-medium text-purple-800 mb-1">Afternoon breaks help evening posture</p>
-                <p className="text-xs text-gray-600">Users who take afternoon breaks have 15% better evening scores</p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Today:</span>
+                <span className="font-semibold text-green-600 dark:text-green-500">
+                  +{loading ? '--' : dashboardData?.pointsToday || 0}
+                </span>
               </div>
             </CardContent>
           </Card>
         </div>
       </section>
 
-      {/* SECTION 4: ACTIVE GOALS */}
-      <section className="mb-8">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Active Goals</h3>
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium">Daily Posture Target</h4>
-                <Badge variant="secondary">Daily</Badge>
-              </div>
-              <div className="mb-2">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Progress</span>
-                  <span>78%</span>
-                </div>
-                <Progress value={78} className="h-2" />
-              </div>
-              <p className="text-xs text-gray-500">Maintain 80% good posture throughout the day</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium">Break Consistency</h4>
-                <Badge variant="secondary">Weekly</Badge>
-              </div>
-              <div className="mb-2">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Progress</span>
-                  <span>83%</span>
-                </div>
-                <Progress value={83} className="h-2" />
-              </div>
-              <p className="text-xs text-gray-500">Complete all break reminders this week</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium">Streak Master</h4>
-                <Badge variant="secondary">Monthly</Badge>
-              </div>
-              <div className="mb-2">
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Progress</span>
-                  <span>40%</span>
-                </div>
-                <Progress value={40} className="h-2" />
-              </div>
-              <p className="text-xs text-gray-500">30-day perfect posture streak</p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+      {/* SECTION 4: INSIGHTS & ALERTS */}
+      {!loading && dashboardData && (dashboardData.insights.length > 0 || dashboardData.problemAlerts.length > 0) && (
+        <section className="mb-8">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Insights & Alerts</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            {dashboardData.insights.map((insight, index) => (
+              <Card key={index}>
+                <CardContent className="p-4 flex items-start gap-3">
+                  <Star className="w-5 h-5 text-blue-500 dark:text-blue-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-gray-900 dark:text-gray-100">{insight}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {dashboardData.problemAlerts.map((alert, index) => (
+              <Card key={index} className="border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30">
+                <CardContent className="p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-500 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-orange-900 dark:text-orange-300">{alert.title}</p>
+                    <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">{alert.description}</p>
+                    {alert.exerciseLink && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 mt-2 text-orange-700 dark:text-orange-400"
+                        onClick={() => router.push(`/exercises?area=${alert.area}`)}
+                      >
+                        View exercises <ArrowRight className="w-3 h-3 ml-1" />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* SECTION 5: RECENT ACTIVITY */}
-      <section className="mb-8">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h3>
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Morning session completed</p>
-                    <p className="text-xs text-gray-500">85% posture score • 2 hours ago</p>
-                  </div>
-                </div>
-                <Badge className="bg-green-100 text-green-800">+50 pts</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                    <Coffee className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Break completed</p>
-                    <p className="text-xs text-gray-500">5-minute stretch routine • 3 hours ago</p>
-                  </div>
-                </div>
-                <Badge className="bg-blue-100 text-blue-800">+25 pts</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
-                    <Trophy className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Achievement unlocked</p>
-                    <p className="text-xs text-gray-500">"7-Day Streak" badge • Yesterday</p>
-                  </div>
-                </div>
-                <Badge className="bg-yellow-100 text-yellow-800">+100 pts</Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* SECTION 6: RECOMMENDATIONS */}
-      <section className="mb-8">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Recommended for You</h3>
-        <div className="grid lg:grid-cols-2 gap-6">
+      {!loading && dashboardData && dashboardData.recentSessions.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Recent Sessions</h3>
+            <Button variant="link" onClick={() => router.push('/insights')}>
+              View all <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
           <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                  <Activity className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <h4 className="font-semibold">Neck Relief Routine</h4>
-                  <p className="text-sm text-gray-500">5 minutes • Recommended based on your posture patterns</p>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Forward head posture detected 65% of the time. This routine targets neck tension and helps realign your head position.
-              </p>
-              <Button className="w-full">Start Routine</Button>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mr-4">
-                  <Target className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <h4 className="font-semibold">Posture Goal Adjustment</h4>
-                  <p className="text-sm text-gray-500">2 minutes • Optimize your daily targets</p>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Your current goals may be too ambitious. Consider adjusting to 75% target for better consistency.
-              </p>
-              <Button variant="outline" className="w-full">Adjust Goals</Button>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* SECTION 7: UPCOMING */}
-      <section>
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Coming Up</h3>
-        <div className="grid md:grid-cols-2 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Coffee className="w-5 h-5 text-blue-500 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium">Next break reminder</p>
-                    <p className="text-xs text-gray-500">In 15 minutes</p>
+            <CardContent className="p-0">
+              <div className="divide-y dark:divide-gray-700">
+                {dashboardData.recentSessions.map((session: any, index: number) => (
+                  <div key={index} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          session.overallScore >= 80 ? 'bg-green-100 dark:bg-green-950/50' :
+                          session.overallScore >= 70 ? 'bg-yellow-100 dark:bg-yellow-950/50' :
+                          'bg-orange-100 dark:bg-orange-950/50'
+                        }`}>
+                          <span className={`text-lg font-bold ${getScoreColor(session.overallScore)}`}>
+                            {session.overallScore}
+                          </span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            {new Date(session.startTime).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {session.duration} minutes • {session.pointsEarned} points
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={session.overallScore >= 80 ? 'default' : 'secondary'}>
+                        {getScoreLabel(session.overallScore)}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-                <Button size="sm" variant="outline">Snooze</Button>
+                ))}
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Calendar className="w-5 h-5 text-purple-500 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium">Posture calibration</p>
-                    <p className="text-xs text-gray-500">In 2 days</p>
-                  </div>
-                </div>
-                <Button size="sm" variant="outline">Schedule</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   )
 }
