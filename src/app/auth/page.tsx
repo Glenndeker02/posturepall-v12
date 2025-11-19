@@ -18,27 +18,81 @@ export default function AuthPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Handle signup logic
-    setTimeout(() => {
+
+    try {
+      const formData = new FormData(e.target as HTMLFormElement)
+      const name = formData.get('name') as string
+      const email = formData.get('email') as string
+      const password = formData.get('password') as string
+      const confirmPassword = formData.get('confirmPassword') as string
+
+      if (password !== confirmPassword) {
+        alert('Passwords do not match')
+        setIsLoading(false)
+        return
+      }
+
+      const response = await fetch('/api/auth/mobile/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Store user session
+        localStorage.setItem('authToken', data.accessToken)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        sessionStorage.setItem('authSuccess', 'true')
+
+        // Redirect to onboarding
+        window.location.href = '/onboarding'
+      } else {
+        alert(data.error || 'Signup failed')
+      }
+    } catch (error) {
+      console.error('Signup error:', error)
+      alert('An error occurred during signup')
+    } finally {
       setIsLoading(false)
-      // Set auth success flag and simulate token
-      sessionStorage.setItem('authSuccess', 'true')
-      localStorage.setItem('authToken', 'demo-token-' + Date.now())
-      window.location.href = '/dashboard'
-    }, 2000)
+    }
   }
 
   const handleSignin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Handle signin logic
-    setTimeout(() => {
+
+    try {
+      const formData = new FormData(e.target as HTMLFormElement)
+      const email = formData.get('email') as string
+      const password = formData.get('password') as string
+
+      const response = await fetch('/api/auth/mobile/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Store user session
+        localStorage.setItem('authToken', data.accessToken)
+        localStorage.setItem('user', JSON.stringify(data.user))
+        sessionStorage.setItem('authSuccess', 'true')
+
+        // Redirect to dashboard
+        window.location.href = '/dashboard'
+      } else {
+        alert(data.error || 'Login failed')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      alert('An error occurred during login')
+    } finally {
       setIsLoading(false)
-      // Set auth success flag and simulate token
-      sessionStorage.setItem('authSuccess', 'true')
-      localStorage.setItem('authToken', 'demo-token-' + Date.now())
-      window.location.href = '/dashboard'
-    }, 2000)
+    }
   }
 
   const handleGoogleAuth = async () => {
@@ -99,6 +153,7 @@ export default function AuthPage() {
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="signin-email"
+                          name="email"
                           type="email"
                           placeholder="Enter your email"
                           className="pl-10"
@@ -113,6 +168,7 @@ export default function AuthPage() {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="signin-password"
+                          name="password"
                           type={showPassword ? "text" : "password"}
                           placeholder="Enter your password"
                           className="pl-10 pr-10"
@@ -206,6 +262,7 @@ export default function AuthPage() {
                         <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="signup-name"
+                          name="name"
                           type="text"
                           placeholder="Enter your full name"
                           className="pl-10"
@@ -220,6 +277,7 @@ export default function AuthPage() {
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="signup-email"
+                          name="email"
                           type="email"
                           placeholder="Enter your email"
                           className="pl-10"
@@ -234,10 +292,12 @@ export default function AuthPage() {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="signup-password"
+                          name="password"
                           type={showPassword ? "text" : "password"}
-                          placeholder="Create a password"
+                          placeholder="Create a password (min 8 characters)"
                           className="pl-10 pr-10"
                           required
+                          minLength={8}
                         />
                         <button
                           type="button"
@@ -255,10 +315,12 @@ export default function AuthPage() {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="signup-confirm"
+                          name="confirmPassword"
                           type={showPassword ? "text" : "password"}
                           placeholder="Confirm your password"
                           className="pl-10"
                           required
+                          minLength={8}
                         />
                       </div>
                     </div>
