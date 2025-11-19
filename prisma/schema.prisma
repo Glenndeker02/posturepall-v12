@@ -14,24 +14,26 @@ datasource db {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  email             String?   @unique
-  emailVerified     DateTime?
-  name              String?
-  image             String?
-  avatar            String?
-  password          String?   // For email/password authentication (hashed)
-  subscriptionTier  String    @default("free") // free, premium
-  workEnvironment   String?   // office, home, flexible, student, gaming, other
-  dailySittingHours Int?      // 2-14 hours
-  painAreas         String?   // JSON array of pain areas
-  workSchedule      String?   // JSON object with work hours and preferences
-  userGoals         String?   // JSON object with user goals
-  calibrationData   String?   // JSON object with posture baseline
-  qrPairingCode     String?   @unique
-  mobileDeviceId    String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  email                 String?   @unique
+  emailVerified         DateTime?
+  name                  String?
+  image                 String?
+  avatar                String?
+  password              String?   // For email/password authentication (hashed)
+  resetPasswordToken    String?   // Token for password reset
+  resetPasswordExpires  DateTime? // Expiration time for reset token
+  subscriptionTier      String    @default("free") // free, premium
+  workEnvironment       String?   // office, home, flexible, student, gaming, other
+  dailySittingHours     Int?      // 2-14 hours
+  painAreas             String?   // JSON array of pain areas
+  workSchedule          String?   // JSON object with work hours and preferences
+  userGoals             String?   // JSON object with user goals
+  calibrationData       String?   // JSON object with posture baseline
+  qrPairingCode         String?   @unique
+  mobileDeviceId        String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   accounts          Account[]
   sessions          Session[]

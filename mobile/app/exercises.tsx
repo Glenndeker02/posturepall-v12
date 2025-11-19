@@ -18,12 +18,13 @@ import {
 } from '../components'
 import { useAppStore } from '../store'
 import { Exercise } from '../types'
+import apiService from '../services/api'
 
 type Category = 'all' | 'neck' | 'shoulder' | 'back' | 'eye' | 'fullBody' | 'breathing'
 type Difficulty = 'all' | 'beginner' | 'intermediate' | 'advanced'
 type SortBy = 'popular' | 'duration' | 'recent'
 
-// Mock exercises data - in production, this would come from API
+// Fallback exercises data - used when API is unavailable or returns empty
 const mockExercises: Exercise[] = [
   {
     id: '1',
@@ -120,18 +121,60 @@ const mockExercises: Exercise[] = [
 export default function ExercisesScreen() {
   const router = useRouter()
   const { favoriteExercises, toggleFavoriteExercise } = useAppStore()
-  const [exercises, setExercises] = useState<Exercise[]>(mockExercises)
-  const [filteredExercises, setFilteredExercises] = useState<Exercise[]>(mockExercises)
-  const [loading, setLoading] = useState(false)
+  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([])
+  const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState<Category>('all')
   const [difficulty, setDifficulty] = useState<Difficulty>('all')
   const [sortBy, setSortBy] = useState<SortBy>('popular')
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilterModal, setShowFilterModal] = useState(false)
 
+  // Fetch exercises from API on mount
+  useEffect(() => {
+    fetchExercises()
+  }, [])
+
   useEffect(() => {
     filterAndSortExercises()
   }, [category, difficulty, sortBy, searchQuery, exercises])
+
+  const fetchExercises = async () => {
+    try {
+      setLoading(true)
+      const response = await apiService.getExercises()
+
+      if (response.success && response.exercises) {
+        // Map backend exercise format to frontend format if needed
+        const mappedExercises: Exercise[] = response.exercises.map((ex: any) => ({
+          id: ex.id,
+          name: ex.name,
+          description: ex.description || '',
+          category: ex.category || 'back',
+          duration: ex.duration || 5,
+          difficulty: ex.difficulty || 'beginner',
+          instructions: ex.instructions ? JSON.parse(ex.instructions) : [],
+          benefits: [],
+          videoUrl: ex.gifUrl || ex.imageUrl || '',
+          thumbnailUrl: ex.imageUrl || '',
+          rating: 4.5,
+          createdAt: ex.createdAt || new Date().toISOString(),
+          updatedAt: ex.updatedAt || new Date().toISOString(),
+        }))
+
+        setExercises(mappedExercises.length > 0 ? mappedExercises : mockExercises)
+      } else {
+        // Fallback to mock data if API fails
+        setExercises(mockExercises)
+      }
+    } catch (error) {
+      console.error('Failed to fetch exercises:', error)
+      // Fallback to mock data on error
+      setExercises(mockExercises)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filterAndSortExercises = () => {
     let result = [...exercises]
