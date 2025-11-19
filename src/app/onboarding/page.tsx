@@ -155,11 +155,50 @@ export default function Onboarding() {
     }
   }
 
-  const handleComplete = () => {
-    // In a real app, this would save the data and redirect
-    console.log('Onboarding completed:', onboardingData)
-    // Redirect to calibration or dashboard
-    window.location.href = '/calibration'
+  const handleComplete = async () => {
+    try {
+      // Get user data from localStorage
+      const userStr = localStorage.getItem('user')
+      if (!userStr) {
+        alert('Please login first')
+        window.location.href = '/auth'
+        return
+      }
+
+      const user = JSON.parse(userStr)
+
+      // Save onboarding data to backend
+      const response = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          name: onboardingData.name || user.name,
+          workEnvironment: onboardingData.workEnvironment,
+          dailySittingHours: onboardingData.dailySittingHours,
+          painAreas: onboardingData.painAreas,
+          workSchedule: onboardingData.workSchedule,
+          userGoals: {
+            primaryGoal: onboardingData.primaryGoal,
+            commitmentLevel: onboardingData.commitmentLevel
+          }
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Update user in localStorage
+        localStorage.setItem('user', JSON.stringify(data.user))
+        // Redirect to calibration
+        window.location.href = '/calibration'
+      } else {
+        alert('Failed to save onboarding data')
+      }
+    } catch (error) {
+      console.error('Onboarding save error:', error)
+      alert('An error occurred while saving your data')
+    }
   }
 
   const renderStep = () => {
